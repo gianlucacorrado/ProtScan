@@ -1,0 +1,681 @@
+#!/usr/bin/env python
+"""protscan."""
+
+import argparse
+import joblib
+from time import time
+import os
+import numpy as np
+from eden.util import configure_logging, serialize_dict
+from protscan.common import fasta_to_seq, bed_to_dictionary
+from protscan.util import add_default, random_exp_scale
+from protscan.model import RegressionModel
+
+import logging
+
+__author__ = "Gianluca Corrado, Fabrizio Costa"
+__copyright__ = "Copyright 2016, Gianluca Corrado"
+__license__ = "MIT"
+__maintainer__ = "Gianluca Corrado"
+__email__ = "gianluca.corrado@unitn.it"
+__status__ = "Production"
+__version__ = "0.1"
+
+description = """
+---------------------------------------------
+protscan: protein-RNA binding site prediction
+---------------------------------------------
+"""
+
+epilog = """
+-----------------------------------------
+Authors: Gianluca Corrado, Fabrizio Costa
+Copyright: 2016
+License: MIT
+Maintainer: Gianluca Corrado
+Email: gianluca.corrado@unitn.it
+Status: Production
+-----------------------------------------
+"""
+
+
+def init_max_dist_vals(args):
+    """Intialize max dist values."""
+    n_samples = vars(args).get('n_iter', 0)
+    np.random.seed(args.random_state)
+    max_dist_values = add_default(
+        50,  # default value
+        np.random.randint(25, 150, size=n_samples))
+    return max_dist_values
+
+
+def init_preprocessor_params(args):
+    """Intialize preprocessor parameters."""
+    np.random.seed(args.random_state)
+    n_samples = vars(args).get('n_iter', 0)
+    preprocessor_params = {
+        'negative_ratio': add_default(
+            3,  # default value
+            np.random.randint(1, 7, size=n_samples)),
+
+        'split_step': add_default(
+            3,  # default value
+            np.random.randint(1, 10, size=n_samples)),
+
+        'split_window': add_default(
+            50,  # default value
+            np.random.randint(25, 150, size=n_samples))
+    }
+    return preprocessor_params
+
+
+def init_vectorizer_params(args):
+    """Intialize vectorizer parameters."""
+    vectorizer_params = {
+        'complexity': [3, 2],  # first is default
+
+        'nbits': [args.nbits]
+    }
+    return vectorizer_params
+
+
+def init_regressor_params(args):
+    """Intialize regressor parameters."""
+    np.random.seed(args.random_state)
+    n_samples = vars(args).get('n_iter', 0)
+    regressor_params = {
+        'loss': ['squared_loss', 'huber', 'epsilon_insensitive',
+                 'squared_epsilon_insensitive'],  # first is default
+
+        'penalty': ['l2', 'l1', 'elasticnet'],  # first is default
+
+        'alpha': add_default(
+            0.0001,  # default value
+            random_exp_scale(-8, 0, size=n_samples)),
+
+        'l1_ratio': add_default(
+            0.5,  # default value
+            np.random.uniform(0.1, 0.9, size=n_samples)),
+
+        'n_iter': add_default(
+            5,  # default value
+            np.random.randint(1, 50, size=n_samples)),
+
+        'eta0': add_default(
+            0.01,  # default value
+            random_exp_scale(-4, -1, size=n_samples)),
+
+        'power_t': add_default(
+            0.25,  # default value
+            np.random.uniform(0.1, 1.0, size=n_samples))
+    }
+    return regressor_params
+
+
+def init_smoothing_params(args):
+    """Intialize smoothing parameters."""
+    np.random.seed(args.random_state)
+    n_samples = vars(args).get('n_iter', 0)
+    smoothing_params = {
+        'window': add_default(
+            70,  # default value
+            np.random.randint(30, 150, size=n_samples)),
+        'std': add_default(
+            20,  # default value
+            np.random.randint(5, 100, size=n_samples)),
+    }
+    return smoothing_params
+
+
+def argparse_setup(description, epilog):
+    """Setup of argparse."""
+    class DefaultsRawDescriptionHelpFormatter(
+            argparse.ArgumentDefaultsHelpFormatter,
+            argparse.RawDescriptionHelpFormatter):
+        # To join the behaviour of RawDescriptionHelpFormatter with that of
+        # ArgumentDefaultsHelpFormatter
+        pass
+
+    parser = argparse.ArgumentParser(
+        description=description,
+        epilog=epilog,
+        formatter_class=DefaultsRawDescriptionHelpFormatter)
+
+    parser.add_argument('--version', action='version',
+                        version="ProtScan v. " + __version__)
+
+    subparsers = parser.add_subparsers(help='commands')
+    # optimization commands
+    opt_parser = subparsers.add_parser(
+        'optimize',
+        help="Optimize model hyperparameters (and fit --fit-opt).",
+        formatter_class=DefaultsRawDescriptionHelpFormatter)
+    opt_parser.set_defaults(which='optimize')
+    # # add domain specific arguments
+    opt_parser.add_argument("-f", "--fasta",
+                            dest="fasta",
+                            type=str,
+                            help="""Fasta file of the RNA sequences.""",
+                            required=True)
+    opt_parser.add_argument("-b", "--bed",
+                            dest="bed",
+                            type=str,
+                            help="""BED file with the binding sites.""",
+                            required=True)
+    opt_parser.add_argument("-m", "--model-file",
+                            dest="model_file",
+                            type=str,
+                            help="""Model name.""",
+                            required=True)
+    opt_parser.add_argument("--mode",
+                            dest="mode",
+                            type=str,
+                            help="""protscan mode, either 'sequence',
+                            'rnafold' or 'rnaplfold'.""",
+                            required=True)
+    opt_parser.add_argument("--store-path",
+                            dest="store_path",
+                            type=str,
+                            help="""Path to store. To use only if --mode is
+                            set to store.""",
+                            default=None)
+    opt_parser.add_argument("-e", "--n-iter",
+                            dest="n_iter",
+                            type=int,
+                            help="""Number of randomly generated hyper
+                            parameter configurations to try during the
+                            model optimization. A value of 1 implies using
+                            the model default values.""",
+                            default=20)
+    opt_parser.add_argument("--n-smoothing-iter",
+                            dest="n_smoothing_iter",
+                            type=int,
+                            help="""Number of randomly generated hyper
+                            parameter configurations to try for the smoothing
+                            step for each parameter configuration of the
+                            other steps (preprocessing, vectorization,
+                            regression).""",
+                            default=20)
+    opt_parser.add_argument("--opt-fraction",
+                            dest="opt_fraction",
+                            type=float,
+                            help="""Fraction of the transcripts to use for the
+                            optimization phase. The transcripts are sampled
+                            maintaining the positive/negative ratio present in
+                            the full dataset.""",
+                            default=1.0)
+    opt_parser.add_argument("--two-steps",
+                            dest="two_steps_opt",
+                            help="""Enable two steps optimization. After
+                            n_iter / 2 iterations the pool of hyperparameters
+                            is updated using the ones that have produced at
+                            at least one suboptimal solution.
+                            """,
+                            action="store_true",
+                            default=False)
+    opt_parser.add_argument("--fit-batch-size",
+                            dest="fit_batch_size",
+                            type=int,
+                            help="""Batch size (in transcripts) for fitting
+                            the regressor. Setting this parameter to an high
+                            value might improve the computation time, but it
+                            requires more memory.""",
+                            default=1000)
+    opt_parser.add_argument("--predict-batch-size",
+                            dest="predict_batch_size",
+                            type=int,
+                            help="""Batch size (in transcripts) for the
+                            predicting step. Setting this parameter to an high
+                            value might improve the computation time, but it
+                            requires more memory.""",
+                            default=250)
+    opt_parser.add_argument("--fit-opt",
+                            dest="fit_with_opt_params",
+                            help="""At the end of the optimization phase, fit
+                            the model on the full dataset (using the optimal
+                            parameters).""",
+                            action="store_true",
+                            default=False)
+    opt_parser.add_argument("--max-total-time",
+                            dest="max_total_time",
+                            type=int,
+                            help="""Maximal number of seconds for the duration
+                            of the optimization phase. After that the procedure
+                            is forcefully stopped. A value of -1 means no time
+                            limit.""",
+                            default=-1)
+    opt_parser.add_argument("--seed",
+                            dest="random_state",
+                            type=int,
+                            help="""Random state for the pseudo randomness.""",
+                            default=1234)
+    opt_parser.add_argument("--n-bits",
+                            dest="nbits",
+                            type=int,
+                            help="""Number of bits of the vetorizer.""",
+                            default=13)
+    opt_parser.add_argument("--n-jobs",
+                            dest="n_jobs",
+                            type=int,
+                            help="""Number of cores to use for the
+                            vectorization. A value of -1 means all the
+                            available cores.""",
+                            default=-1)
+    opt_parser.add_argument("-v", "--verbose",
+                            action="count",
+                            help="Increase output verbosity")
+    opt_parser.add_argument("-x", "--no-logging",
+                            dest="no_logging",
+                            help="If set, do not log on file.",
+                            action="store_true")
+
+    # fit commands
+    fit_parser = subparsers.add_parser(
+        'fit',
+        help="Fit a model.",
+        formatter_class=DefaultsRawDescriptionHelpFormatter)
+    fit_parser.set_defaults(which='fit')
+    # # add domain specific arguments
+    fit_parser.add_argument("-f", "--fasta",
+                            dest="fasta",
+                            type=str,
+                            help="""Fasta file of the RNA sequences.""",
+                            required=True)
+    fit_parser.add_argument("-b", "--bed",
+                            dest="bed",
+                            type=str,
+                            help="""BED file with the binding sites.""",
+                            required=True)
+    fit_parser.add_argument("-m", "--model-file",
+                            dest="model_file",
+                            type=str,
+                            help="""Model name. If a model is provided,
+                            the hyperparameteters will be used for the
+                            fitting.""",
+                            required=True)
+    fit_parser.add_argument("--mode",
+                            dest="mode",
+                            type=str,
+                            help="""protscan mode, either 'sequence',
+                            'rnafold' or 'rnaplfold'. To be specified in case
+                            no model is provided as input. Default
+                            hyperparameters will be set automatically.""",
+                            default=None)
+    fit_parser.add_argument("--store-path",
+                            dest="store_path",
+                            type=str,
+                            help="""Path to store. To use only if --mode is
+                            set to store.""",
+                            default=None)
+    fit_parser.add_argument("--fit-batch-size",
+                            dest="fit_batch_size",
+                            type=int,
+                            help="""Batch size (in transcripts) for fitting
+                            the regressor. Setting this parameter to an high
+                            value might improve the computation time, but it
+                            requires more memory.""",
+                            default=1000)
+    fit_parser.add_argument("--seed",
+                            dest="random_state",
+                            type=int,
+                            help="""Random state for the pseudo randomness.""",
+                            default=1234)
+    fit_parser.add_argument("--n-jobs",
+                            dest="n_jobs",
+                            type=int,
+                            help="""Number of cores to use for the
+                            vectorization. A value of -1 means all the
+                            available cores.""",
+                            default=-1)
+    fit_parser.add_argument("--n-bits",
+                            dest="nbits",
+                            type=int,
+                            help="""Number of bits of the vetorizer.""",
+                            default=13)
+    fit_parser.add_argument("-v", "--verbose",
+                            action="count",
+                            help="Increase output verbosity")
+    fit_parser.add_argument("-x", "--no-logging",
+                            dest="no_logging",
+                            help="If set, do not log on file.",
+                            action="store_true")
+
+    # predict commands
+    pre_parser = subparsers.add_parser(
+        'predict',
+        help="Predict binding affinities using a model.",
+        formatter_class=DefaultsRawDescriptionHelpFormatter)
+    pre_parser.set_defaults(which='predict')
+    # # add domain specific arguments
+    pre_parser.add_argument("-f", "--fasta",
+                            dest="fasta",
+                            type=str,
+                            help="""Fasta file of the RNA sequences.""",
+                            required=True)
+    pre_parser.add_argument("-m", "--model-file",
+                            dest="model_file",
+                            type=str,
+                            help="""Model name.""",
+                            required=True)
+    pre_parser.add_argument("-o", "--output-file",
+                            dest="output_file",
+                            type=str,
+                            help="""File name for the output file. The output
+                            will contain a dictionary of predicted profiles,
+                            keys are transcript names.""",
+                            required=True)
+    pre_parser.add_argument("--predict-batch-size",
+                            dest="predict_batch_size",
+                            type=int,
+                            help="""Batch size (in transcripts) for the
+                            predicting step. Setting this parameter to an high
+                            value might improve the computation time, but it
+                            requires more memory.""",
+                            default=250)
+    pre_parser.add_argument("--seed",
+                            dest="random_state",
+                            type=int,
+                            help="""Random state for the pseudo randomness.""",
+                            default=1234)
+    pre_parser.add_argument("--n-jobs",
+                            dest="n_jobs",
+                            type=int,
+                            help="""Number of cores to use for the
+                            vectorization. A value of -1 means all the
+                            available cores.""",
+                            default=-1)
+    pre_parser.add_argument("-v", "--verbose",
+                            action="count",
+                            help="Increase output verbosity")
+    pre_parser.add_argument("-x", "--no-logging",
+                            dest="no_logging",
+                            help="If set, do not log on file.",
+                            action="store_true")
+
+    # cross predict commands
+    cpr_parser = subparsers.add_parser(
+        'crosspredict',
+        help="2-fold cross validated predictions.",
+        formatter_class=DefaultsRawDescriptionHelpFormatter)
+    cpr_parser.set_defaults(which='crosspredict')
+    # # add domain specific arguments
+    cpr_parser.add_argument("-f", "--fasta",
+                            dest="fasta",
+                            type=str,
+                            help="""Fasta file of the RNA sequences.""",
+                            required=True)
+    cpr_parser.add_argument("-b", "--bed",
+                            dest="bed",
+                            type=str,
+                            help="""BED file with the binding sites.""",
+                            required=True)
+    cpr_parser.add_argument("-m", "--model-file",
+                            dest="model_file",
+                            type=str,
+                            help="""Model name. If a model is provided,
+                            the hyperparameteters will be used for the
+                            cross prediction.""",
+                            default=None)
+    cpr_parser.add_argument("--mode",
+                            dest="mode",
+                            type=str,
+                            help="""protscan mode, either 'sequence',
+                            'rnafold' or 'rnaplfold'. To be specified in case
+                            no model is provided as input. Default
+                            hyperparameters will be set automatically.""",
+                            default=None)
+    cpr_parser.add_argument("--store-path",
+                            dest="store_path",
+                            type=str,
+                            help="""Path to store. To use only if --mode is
+                            set to store.""",
+                            default=None)
+    cpr_parser.add_argument("-o", "--output-file",
+                            dest="output_file",
+                            type=str,
+                            help="""File name for the output file. The output
+                            will contain a dictionary of predicted profiles,
+                            keys are transcript names.""",
+                            required=True)
+    cpr_parser.add_argument("--fit-batch-size",
+                            dest="fit_batch_size",
+                            type=int,
+                            help="""Batch size (in transcripts) for fitting
+                            the regressor. Setting this parameter to an high
+                            value might improve the computation time, but it
+                            requires more memory.""",
+                            default=1000)
+    cpr_parser.add_argument("--predict-batch-size",
+                            dest="predict_batch_size",
+                            type=int,
+                            help="""Batch size (in transcripts) for the
+                            predicting step. Setting this parameter to an high
+                            value might improve the computation time, but it
+                            requires more memory.""",
+                            default=250)
+    cpr_parser.add_argument("--seed",
+                            dest="random_state",
+                            type=int,
+                            help="""Random state for the pseudo randomness.""",
+                            default=1234)
+    cpr_parser.add_argument("--n-jobs",
+                            dest="n_jobs",
+                            type=int,
+                            help="""Number of cores to use for the
+                            vectorization. A value of -1 means all the
+                            available cores.""",
+                            default=-1)
+    cpr_parser.add_argument("--n-bits",
+                            dest="nbits",
+                            type=int,
+                            help="""Number of bits of the vetorizer.""",
+                            default=13)
+    cpr_parser.add_argument("-v", "--verbose",
+                            action="count",
+                            help="Increase output verbosity")
+    cpr_parser.add_argument("-x", "--no-logging",
+                            dest="no_logging",
+                            help="If set, do not log on file.",
+                            action="store_true")
+
+    return parser
+
+
+def main_optimize(args):
+    """Optimize a model (and eventually fit it).
+
+    Optimization can be called for finding the optimal hyperparameters of
+    the model. The optimization can be done on a subset of the sequences, and
+    at the end of the otimization the optimal hyperparameters are saved.
+    Additionally it is possible to fit the model on the full dataset using the
+    optimized parameters.
+    """
+    sequences = fasta_to_seq(args.fasta)
+    bin_sites = bed_to_dictionary(args.bed)
+
+    max_dist_vals = init_max_dist_vals(args)
+    preprocessor_params = init_preprocessor_params(args)
+    vectorizer_params = init_vectorizer_params(args)
+    regressor_params = init_regressor_params(args)
+    smoothing_params = init_smoothing_params(args)
+
+    model = RegressionModel(mode=args.mode,
+                            store_path=args.store_path,
+                            random_state=args.random_state)
+
+    model.optimize(sequences=sequences,
+                   bin_sites=bin_sites,
+                   model_name=args.model_file,
+                   n_iter=args.n_iter,
+                   n_smoothing_iter=args.n_smoothing_iter,
+                   opt_fraction=args.opt_fraction,
+                   max_dist_vals=max_dist_vals,
+                   preprocessor_params=preprocessor_params,
+                   vectorizer_params=vectorizer_params,
+                   regressor_params=regressor_params,
+                   smoothing_params=smoothing_params,
+                   two_steps_opt=args.two_steps_opt,
+                   fit_batch_size=args.fit_batch_size,
+                   predict_batch_size=args.predict_batch_size,
+                   fit_with_opt_params=args.fit_with_opt_params,
+                   max_total_time=args.max_total_time,
+                   random_state=args.random_state,
+                   n_jobs=args.n_jobs)
+
+
+def main_fit(args):
+    """Fit a model.
+
+    Fit can be called for:
+        * generating a new model, in this case the model will be fitted using
+          the default hyperparameters;
+        * fitting an optimized model, in this case the optimal hyperparameters
+          will be used.
+    """
+    try:
+        # Try to load the model file. The idea is that this model
+        # has optimized hyperparameters.
+        model = RegressionModel()
+        model.load(args.model_file)
+    except:
+        # If the model file does not exist create a new model
+        # with default parameters.
+        if args.mode is not None:
+            model = RegressionModel(mode=args.mode,
+                                    store_path=args.store_path,
+                                    random_state=args.random_state)
+            # parameters
+            max_dist_vals = init_max_dist_vals(args)
+            preprocessor_params = init_preprocessor_params(args)
+            vectorizer_params = init_vectorizer_params(args)
+            regressor_params = init_regressor_params(args)
+            smoothing_params = init_smoothing_params(args)
+            # select default
+            model.max_dist = max_dist_vals[0]
+            model.preprocessor_args = model._default(preprocessor_params)
+            model.vectorizer_args = model._default(vectorizer_params)
+            model.regressor_args = model._default(regressor_params)
+            model.smoothing_args = model._default(smoothing_params)
+        else:
+            raise Exception("Model file %s not found, 'mode' cannot be None.")
+            exit(1)
+
+    sequences = fasta_to_seq(args.fasta)
+    bin_sites = bed_to_dictionary(args.bed)
+
+    model.fit(sequences=sequences,
+              bin_sites=bin_sites,
+              model_name=args.model_file,
+              fit_batch_size=args.fit_batch_size,
+              random_state=args.random_state,
+              n_jobs=args.n_jobs)
+
+
+def main_predict(args):
+    """Predict binding affinities."""
+    try:
+        # Try to load the model file. The model is supposed to be fitted.
+        model = RegressionModel()
+        model.load(args.model_file)
+    except:
+        raise Exception("Model file %s not found." % args.model_file)
+        exit(1)
+    else:
+        sequences = fasta_to_seq(args.fasta)
+        if model.is_fitted is True:
+            profiles = model.predict(
+                sequences=sequences,
+                predict_batch_size=args.predict_batch_size,
+                random_state=args.random_state,
+                n_jobs=args.n_jobs)
+            joblib.dump(profiles, args.output_file,
+                        compress=3, protocol=2)
+        else:
+            raise Exception("Model requires fit.")
+            exit(1)
+
+
+def main_cross_predict(args):
+    """2-fold CV predicted binding affinities."""
+    try:
+        # Try to load the model file. The model is supposed to be fitted.
+        model = RegressionModel()
+        model.load(args.model_file)
+    except:
+        if args.mode is not None:
+            model = RegressionModel(mode=args.mode,
+                                    store_path=args.store_path,
+                                    random_state=args.random_state)
+
+            # parameters
+            max_dist_vals = init_max_dist_vals(args)
+            preprocessor_params = init_preprocessor_params(args)
+            vectorizer_params = init_vectorizer_params(args)
+            regressor_params = init_regressor_params(args)
+            smoothing_params = init_smoothing_params(args)
+            # select default
+            model.max_dist = max_dist_vals[0]
+            model.preprocessor_args.update(model._default(preprocessor_params))
+            model.vectorizer_args = model._default(vectorizer_params)
+            model.regressor_args = model._default(regressor_params)
+            model.smoothing_args = model._default(smoothing_params)
+        else:
+            raise Exception("--mode must be set.")
+            exit(1)
+
+    sequences = fasta_to_seq(args.fasta)
+    bin_sites = bed_to_dictionary(args.bed)
+
+    profiles = model.cross_predict(
+        sequences=sequences,
+        bin_sites=bin_sites,
+        fit_batch_size=args.fit_batch_size,
+        predict_batch_size=args.predict_batch_size,
+        random_state=args.random_state,
+        n_jobs=args.n_jobs)
+    joblib.dump(profiles, args.output_file,
+                compress=3, protocol=2)
+
+
+def main(args):
+    """Main."""
+    if args.which == 'optimize':
+        main_optimize(args)
+    elif args.which == 'fit':
+        main_fit(args)
+    elif args.which == 'predict':
+        main_predict(args)
+    elif args.which == 'crosspredict':
+        main_cross_predict(args)
+    else:
+        raise Exception('Unknown mode: %s' % args.which)
+
+if __name__ == "__main__":
+    parser = argparse_setup(description, epilog)
+    args = parser.parse_args()
+
+    prog_name = os.path.basename(__file__)
+
+    logger = logging.getLogger()
+    if args.no_logging:
+        configure_logging(logger, verbosity=args.verbose)
+    else:
+        configure_logging(logger, verbosity=args.verbose,
+                          filename=prog_name + '.log')
+
+    logger.debug('-' * 80)
+    logger.debug('Program: %s' % prog_name)
+    logger.debug('Called with parameters:\n %s' %
+                 serialize_dict(args.__dict__, offset='large'))
+
+    start_time = time()
+    try:
+        main(args)
+    except Exception:
+        import datetime
+        curr_time = datetime.datetime.now().strftime("%A, %d. %B %Y %I:%M%p")
+        logger.exception("Program run failed on %s" % curr_time)
+        exit(1)
+    finally:
+        end_time = time()
+        logger.info('Elapsed time: %.1f sec', end_time - start_time)
