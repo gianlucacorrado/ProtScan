@@ -23,7 +23,8 @@ import protscan.graph as graph
 from eden.graph import Vectorizer as GraphVectorizer
 
 import protscan.common as common
-from protscan.util import random_partition_iter, balanced_fraction
+from protscan.util import random_partition_iter
+from protscan.util import balanced_fraction, balanced_split
 from protscan.util import additive_update
 
 import logging
@@ -252,8 +253,8 @@ class RegressionModel(object):
                    random_state=1234, n_jobs=-1):
         """2-fold cross fit and vote."""
         votes = dict()
-        part1, part2 = random_partition_iter(sequences, n_splits=2,
-                                             random_state=random_state)
+        part1, part2 = balanced_split(sequences, bin_sites, n_splits=2,
+                                      random_state=random_state)
 
         part1, part1_ = tee(part1)
         part2, part2_ = tee(part2)

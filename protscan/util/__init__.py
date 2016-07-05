@@ -1,7 +1,7 @@
 """Utility functions."""
 
 import random
-from itertools import tee
+from itertools import tee, izip
 import numpy as np
 from eden.util import selection_iterator, iterator_size
 
@@ -33,6 +33,39 @@ def random_partition_iter(iterable, n_splits, random_state=1234):
     for p in part_ids:
         iterable, iterable_ = tee(iterable)
         parts.append(selection_iterator(iterable_, p))
+    return parts
+
+
+def balanced_split(sequences, bin_sites, n_splits,
+                   random_state=1234):
+    """Balanced split over binding/non-binding sequences."""
+    # find the transcript names of positive and negatives
+    sequences, sequences_ = tee(sequences)
+    pos_ids = list()
+    neg_ids = list()
+    for i, (attr, _) in enumerate(sequences_):
+        tr_name = attr['tr_name']
+        is_binding = bin_sites.get(tr_name, False)
+        if is_binding:
+            pos_ids.append(i)
+        else:
+            neg_ids.append(i)
+
+    random.seed(random_state)
+    random.shuffle(pos_ids)
+    random.shuffle(neg_ids)
+
+    pos_split_points = \
+        [int(len(pos_ids) * (float(i) / n_splits)) for i in range(1, n_splits)]
+    neg_split_points = \
+        [int(len(neg_ids) * (float(i) / n_splits)) for i in range(1, n_splits)]
+
+    parts = list()
+    for pos, neg in izip(np.split(pos_ids, pos_split_points),
+                         np.split(neg_ids, neg_split_points)):
+        sequences, sequences_ = tee(sequences)
+        parts.append(selection_iterator(
+            sequences_, np.concatenate([pos, neg])))
     return parts
 
 
