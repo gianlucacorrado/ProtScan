@@ -2,7 +2,7 @@
 """protscan."""
 
 import argparse
-import joblib
+import cPickle
 from time import time
 import os
 import numpy as np
@@ -567,7 +567,9 @@ def main_predict(args):
                 batch_size=args.batch_size,
                 random_state=args.random_state,
                 n_jobs=args.n_jobs)
-            joblib.dump(profiles, args.output_file, compress=1, protocol=2)
+            f = open(args.output_file, 'w')
+            cPickle.dump(profiles, f, protocol=2)
+            f.close()
         else:
             raise Exception("Model requires fit.")
             exit(1)
@@ -610,7 +612,9 @@ def main_cross_predict(args):
         batch_size=args.batch_size,
         random_state=args.random_state,
         n_jobs=args.n_jobs)
-    joblib.dump(profiles, args.output_file, compress=1, protocol=2)
+    f = open(args.output_file, 'w')
+    cPickle.dump(profiles, f, protocol=2)
+    f.close()
 
 
 def main(args):
