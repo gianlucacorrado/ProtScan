@@ -199,9 +199,13 @@ class RegressionModel(object):
     def vote(self, sequences, batch_size=10000, random_state=1234,
              n_jobs=-1):
         """Collect the votes for the binding profiles."""
-        preprocessed = self.preprocessor(sequences,
-                                         which_set='test',
-                                         **self.preprocessor_args)
+        if self.mode == 'sequence':
+            preprocessed = self.preprocessor(sequences,
+                                             which_set='test',
+                                             **self.preprocessor_args)
+        else:
+            raise NotImplementedError("Implement full graph iterator.")
+
         preprocessed, preprocessed_ = tee(preprocessed)
         size = iterator_size(preprocessed_)
         n_splits = max(1, size / batch_size)
@@ -220,13 +224,10 @@ class RegressionModel(object):
                 part_votes = self.vote_aggregator(pred_vals, info,
                                                   self.max_dist)
             else:
-                full_graphs = self.preprocessor(part_,
-                                                which_set='onlyfold',
-                                                n_jobs=n_jobs,
-                                                **self.preprocessor_args)
-                part_votes = self.vote_aggregator(pred_vals, info,
-                                                  self.max_dist,
-                                                  full_graphs)
+                raise NotImplementedError("Implement full graph iterator.")
+                # part_votes = self.vote_aggregator(pred_vals, info,
+                #                                   self.max_dist,
+                #                                   full_graphs)
             additive_update(votes, part_votes)
             delta_time = datetime.timedelta(
                 seconds=(time.time() - start_time))
