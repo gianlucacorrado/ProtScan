@@ -375,9 +375,8 @@ def _transform_dictionary(graphs):
     return dic
 
 
-# TO DO: figure out the multiprocess, if fails remove n_jobs
 def _graph_preprocessor(graphs, which_set, bin_sites=None, max_dist=None,
-                        random_state=1234, n_jobs=-1, **params):
+                        random_state=1234, **params):
     """Preprocess graphs."""
     assert which_set == 'train' or \
         which_set == 'test' or \
@@ -393,37 +392,31 @@ def _graph_preprocessor(graphs, which_set, bin_sites=None, max_dist=None,
         graphs = train_selector(
             graphs, bin_sites, max_dist, random_state, **params)
 
-    # graphs = mp_pre_process(graphs,
-    #                        pre_processor=split_iterator,
-    #                        pre_processor_args=params,
-    #                        block_size=100,
-    #                        n_jobs=n_jobs)
-
     graphs = split_iterator(graphs, **params)
     return graphs
 
 
 def rnafold_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
-                         random_state=1234, n_jobs=-1, **params):
+                         random_state=1234, **params):
     """Fold sequences with RNAfold and preprocess graphs."""
     graphs = rnafold(iterable)
     graphs = _graph_preprocessor(graphs, which_set, bin_sites, max_dist,
-                                 random_state, n_jobs, **params)
+                                 random_state, **params)
     return graphs
 
 
 def rnaplfold_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
-                           random_state=1234, n_jobs=-1, **params):
+                           random_state=1234, **params):
     """Fold sequences with RNAplfold and preprocess graphs."""
     graphs = rnaplfold(iterable)
 
     graphs = _graph_preprocessor(graphs, which_set, bin_sites, max_dist,
-                                 random_state, n_jobs, **params)
+                                 random_state, **params)
     return graphs
 
 
 def store_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
-                       random_state=1234, n_jobs=-1, **params):
+                       random_state=1234, **params):
     """Retrieve folded sequences from HDF store and preprocess graphs."""
     store_path = params.get('store_path')
     data_manager = HDFDataManager(store_path)
@@ -431,7 +424,7 @@ def store_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
     graphs = data_manager.retrieve(names)
 
     graphs = _graph_preprocessor(graphs, which_set, bin_sites, max_dist,
-                                 random_state, n_jobs, **params)
+                                 random_state, **params)
     return graphs
 
 

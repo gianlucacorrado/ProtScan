@@ -77,3 +77,13 @@ def random_exp_scale(from_exp, to_exp, size=1):
             10 ** np.random.randint(from_exp + 1, to_exp)
         sample.append(s)
     return np.array(sample)
+
+
+def additive_update(dic, to_add):
+    """Update a dictionary (summing values if the key exists)."""
+    for k, v in to_add.iteritems():
+        if k in dic.keys():
+            dic[k] += v
+        else:
+            # the values are numpy arrays
+            dic.update({k: v.copy()})

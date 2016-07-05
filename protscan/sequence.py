@@ -455,7 +455,6 @@ def sequence_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
 
     if which_set == 'train':
         split = add_distance(split, bin_sites)
-
     return split
 
 
@@ -476,7 +475,7 @@ def print_stats(iterable):
         (pos, bor, neg, pos + bor + neg)
 
 
-def vote_aggregator(pred_vals, info, max_dist, **params):
+def vote_aggregator(pred_vals, info, max_dist):
     """Get vote profiles from predicted distances and subseq info.
 
     The function assumes that the input contains complete data (predictions
@@ -495,9 +494,6 @@ def vote_aggregator(pred_vals, info, max_dist, **params):
 
     max_dist : int
         Maximum distance from a binding site to be considered relevant.
-
-    **params : dict
-        Dictionary of prediction parameters.
 
     Returns
     -------
