@@ -12,7 +12,7 @@ __email__ = "gianluca.corrado@unitn.it"
 __status__ = "Production"
 
 
-def fasta_to_seq(input, **options):
+def fasta_to_seq(input):
     """Load sequences tuples from fasta file.
 
     Parameters
@@ -29,7 +29,7 @@ def fasta_to_seq(input, **options):
     seq : str
         Sequence.
     """
-    lines = fasta_to_fasta(input, **options)
+    lines = fasta_to_fasta(input)
     for line in lines:
         attr = dict()
         attr['tr_name'] = line.split('.')[0]

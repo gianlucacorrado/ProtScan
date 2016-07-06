@@ -213,13 +213,22 @@ def argparse_setup(description, epilog):
                             """,
                             action="store_true",
                             default=False)
-    opt_parser.add_argument("--batch-size",
-                            dest="batch_size",
+    opt_parser.add_argument("--fit-batch-size",
+                            dest="fit_batch_size",
                             type=int,
-                            help="""Batch size. Setting this parameter to an
-                            high value might improve the computation time, but
-                            it requires more memory.""",
-                            default=10000)
+                            help="""Fit batch size (number of transcripts).
+                            Setting this parameter to an high value might
+                            improve the computation time, but it requires more
+                            memory.""",
+                            default=500)
+    opt_parser.add_argument("--pre-batch-size",
+                            dest="pre_batch_size",
+                            type=int,
+                            help="""Predict batch size (number of transcripts).
+                            Setting this parameter to an high value might
+                            improve the computation time, but it requires more
+                            memory.""",
+                            default=200)
     opt_parser.add_argument("--fit-opt",
                             dest="fit_with_opt_params",
                             help="""At the end of the optimization phase, fit
@@ -298,13 +307,14 @@ def argparse_setup(description, epilog):
                             help="""Path to store. To use only if --mode is
                             set to store.""",
                             default=None)
-    fit_parser.add_argument("--batch-size",
-                            dest="batch_size",
+    fit_parser.add_argument("--fit-batch-size",
+                            dest="fit_batch_size",
                             type=int,
-                            help="""Batch size. Setting this parameter to an
-                            high value might improve the computation time, but
-                            it requires more memory.""",
-                            default=10000)
+                            help="""Fit batch size (number of transcripts).
+                            Setting this parameter to an high value might
+                            improve the computation time, but it requires more
+                            memory.""",
+                            default=500)
     fit_parser.add_argument("--seed",
                             dest="random_state",
                             type=int,
@@ -354,13 +364,14 @@ def argparse_setup(description, epilog):
                             will contain a dictionary of predicted profiles,
                             keys are transcript names.""",
                             required=True)
-    pre_parser.add_argument("--batch-size",
-                            dest="batch_size",
+    pre_parser.add_argument("--pre-batch-size",
+                            dest="pre_batch_size",
                             type=int,
-                            help="""Batch size. Setting this parameter to an
-                            high value might improve the computation time, but
-                            it requires more memory.""",
-                            default=10000)
+                            help="""Predict batch size (number of transcripts).
+                            Setting this parameter to an high value might
+                            improve the computation time, but it requires more
+                            memory.""",
+                            default=200)
     pre_parser.add_argument("--seed",
                             dest="random_state",
                             type=int,
@@ -426,13 +437,22 @@ def argparse_setup(description, epilog):
                             will contain a dictionary of predicted profiles,
                             keys are transcript names.""",
                             required=True)
-    cpr_parser.add_argument("--batch-size",
-                            dest="batch_size",
+    cpr_parser.add_argument("--fit-batch-size",
+                            dest="fit_batch_size",
                             type=int,
-                            help="""Batch size. Setting this parameter to an
-                            high value might improve the computation time, but
-                            it requires more memory.""",
-                            default=10000)
+                            help="""Fit batch size (number of transcripts).
+                            Setting this parameter to an high value might
+                            improve the computation time, but it requires more
+                            memory.""",
+                            default=500)
+    cpr_parser.add_argument("--pre-batch-size",
+                            dest="pre_batch_size",
+                            type=int,
+                            help="""Predict batch size (number of transcripts).
+                            Setting this parameter to an high value might
+                            improve the computation time, but it requires more
+                            memory.""",
+                            default=200)
     cpr_parser.add_argument("--seed",
                             dest="random_state",
                             type=int,
@@ -495,7 +515,8 @@ def main_optimize(args):
                    regressor_params=regressor_params,
                    smoothing_params=smoothing_params,
                    two_steps_opt=args.two_steps_opt,
-                   batch_size=args.batch_size,
+                   fit_batch_size=args.fit_batch_size,
+                   pre_batch_size=args.pre_batch_size,
                    fit_with_opt_params=args.fit_with_opt_params,
                    max_total_time=args.max_total_time,
                    random_state=args.random_state,
@@ -545,7 +566,7 @@ def main_fit(args):
     model.fit(sequences=sequences,
               bin_sites=bin_sites,
               model_name=args.model_file,
-              batch_size=args.batch_size,
+              fit_batch_size=args.fit_batch_size,
               random_state=args.random_state,
               n_jobs=args.n_jobs)
 
@@ -564,7 +585,7 @@ def main_predict(args):
         if model.is_fitted is True:
             profiles = model.predict(
                 sequences=sequences,
-                batch_size=args.batch_size,
+                pre_batch_size=args.pre_batch_size,
                 random_state=args.random_state,
                 n_jobs=args.n_jobs)
             f = open(args.output_file, 'w')
@@ -609,7 +630,8 @@ def main_cross_predict(args):
     profiles = model.cross_predict(
         sequences=sequences,
         bin_sites=bin_sites,
-        batch_size=args.batch_size,
+        fit_batch_size=args.fit_batch_size,
+        pre_batch_size=args.pre_batch_size,
         random_state=args.random_state,
         n_jobs=args.n_jobs)
     f = open(args.output_file, 'w')

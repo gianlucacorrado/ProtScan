@@ -122,9 +122,15 @@ class RegressionModel(object):
         text.append(serialize_dict(self.smoothing_args))
         return '\n'.join(text)
 
-    def get_supervised_data(self, preprocessed, bin_sites, random_state=1234,
+    def get_supervised_data(self, sequences, bin_sites, random_state=1234,
                             n_jobs=-1):
         """Compute the feature matrix and the regression values."""
+        preprocessed = self.preprocessor(sequences,
+                                         which_set='train',
+                                         bin_sites=bin_sites,
+                                         max_dist=self.max_dist,
+                                         random_state=random_state,
+                                         **self.preprocessor_args)
         preprocessed, preprocessed_ = tee(preprocessed)
         if self.mode == 'sequence':
             dists = [attr['dist'] for attr, _ in preprocessed_]
@@ -137,13 +143,15 @@ class RegressionModel(object):
                            block_size=200, n_jobs=n_jobs)
         return matrix, vals
 
-    def get_predict_data(self, preprocessed, n_jobs=-1):
+    def get_predict_data(self, sequences, n_jobs=-1):
         """Compute the feature matrix and extract the subseq info."""
         def _subdict(dic):
             subdict = dict((k, dic[k]) for k in [
                            'tr_name', 'center', 'tr_len'] if k in dic)
             return subdict
-
+        preprocessed = self.preprocessor(sequences,
+                                         which_set='test',
+                                         **self.preprocessor_args)
         preprocessed, preprocessed_ = tee(preprocessed)
         if self.mode == 'sequence':
             info = [_subdict(attr) for attr, _ in preprocessed_]
@@ -156,20 +164,14 @@ class RegressionModel(object):
 
         return matrix, info
 
-    def _fit(self, sequences, bin_sites, batch_size=10000,
+    def _fit(self, sequences, bin_sites, fit_batch_size=500,
              random_state=1234, n_jobs=-1):
         """Fit the regressor (using partial fit)."""
         self.regressor.set_params(**self.regressor_args)
-        preprocessed = self.preprocessor(sequences,
-                                         which_set='train',
-                                         bin_sites=bin_sites,
-                                         max_dist=self.max_dist,
-                                         random_state=random_state,
-                                         **self.preprocessor_args)
-        preprocessed, preprocessed_ = tee(preprocessed)
-        size = iterator_size(preprocessed_)
-        n_splits = max(1, size / batch_size)
-        parts = random_partition_iter(preprocessed, n_splits, random_state)
+        sequences, sequences_ = tee(sequences)
+        size = iterator_size(sequences_)
+        n_splits = max(1, size / fit_batch_size)
+        parts = random_partition_iter(sequences, n_splits, random_state)
         n_parts = len(parts)
         logger.debug("Fitting (%d batch%s)..." %
                      (n_parts, "es" * (n_parts > 1)))
@@ -189,27 +191,20 @@ class RegressionModel(object):
 
         logger.debug("Done!")
 
-    def fit(self, sequences, bin_sites, model_name, batch_size=10000,
+    def fit(self, sequences, bin_sites, model_name, fit_batch_size=500,
             random_state=1234, n_jobs=-1):
         """Fit the regressor (using partial fit), and save the model."""
-        self._fit(sequences, bin_sites, batch_size, random_state, n_jobs)
+        self._fit(sequences, bin_sites, fit_batch_size, random_state, n_jobs)
         self.is_fitted = True
         self.save(model_name)
 
-    def vote(self, sequences, batch_size=10000, random_state=1234,
+    def vote(self, sequences, pre_batch_size=200, random_state=1234,
              n_jobs=-1):
         """Collect the votes for the binding profiles."""
-        if self.mode == 'sequence':
-            preprocessed = self.preprocessor(sequences,
-                                             which_set='test',
-                                             **self.preprocessor_args)
-        else:
-            raise NotImplementedError("Implement full graph iterator.")
-
-        preprocessed, preprocessed_ = tee(preprocessed)
-        size = iterator_size(preprocessed_)
-        n_splits = max(1, size / batch_size)
-        parts = random_partition_iter(preprocessed, n_splits, random_state)
+        sequences, sequences_ = tee(sequences)
+        size = iterator_size(sequences_)
+        n_splits = max(1, size / pre_batch_size)
+        parts = random_partition_iter(sequences, n_splits, random_state)
         n_parts = len(parts)
         logger.debug("Predicting (%d batch%s)..." %
                      (n_parts, "es" * (n_parts > 1)))
@@ -240,15 +235,15 @@ class RegressionModel(object):
         profiles = common.smooth(votes, **self.smoothing_args)
         return profiles
 
-    def predict(self, sequences, predict_batch_size=10000, random_state=1234,
+    def predict(self, sequences, pre_batch_size=200, random_state=1234,
                 n_jobs=-1):
         """Predict binding profiles for a set of sequences."""
-        votes = self.vote(sequences, predict_batch_size, random_state, n_jobs)
+        votes = self.vote(sequences, pre_batch_size, random_state, n_jobs)
         profiles = self.smooth(votes)
         return profiles
 
-    def cross_vote(self, sequences, bin_sites, batch_size=10000,
-                   random_state=1234, n_jobs=-1):
+    def cross_vote(self, sequences, bin_sites, fit_batch_size=500,
+                   pre_batch_size=200, random_state=1234, n_jobs=-1):
         """2-fold cross fit and vote."""
         votes = dict()
         part1, part2 = balanced_split(sequences, bin_sites, n_splits=2,
@@ -260,23 +255,23 @@ class RegressionModel(object):
         # fold 1
         logger.debug("Fold 1")
         tr, te = part1, part2
-        self._fit(tr, bin_sites, batch_size, random_state, n_jobs)
-        part_votes = self.vote(te, batch_size, random_state, n_jobs)
+        self._fit(tr, bin_sites, fit_batch_size, random_state, n_jobs)
+        part_votes = self.vote(te, pre_batch_size, random_state, n_jobs)
         votes.update(part_votes)
 
         # fold 2
         logger.debug("Fold 2")
         tr, te = part2_, part1_
-        self._fit(tr, bin_sites, batch_size, random_state, n_jobs)
-        part_votes = self.vote(te, batch_size, random_state, n_jobs)
+        self._fit(tr, bin_sites, fit_batch_size, random_state, n_jobs)
+        part_votes = self.vote(te, pre_batch_size, random_state, n_jobs)
         votes.update(part_votes)
         return votes
 
-    def cross_predict(self, sequences, bin_sites, batch_size=10000,
-                      random_state=1234, n_jobs=-1):
+    def cross_predict(self, sequences, bin_sites, fit_batch_size=500,
+                      pre_batch_size=200, random_state=1234, n_jobs=-1):
         """2-fold cross fit and predict."""
-        votes = self.cross_vote(sequences, bin_sites, batch_size,
-                                random_state, n_jobs)
+        votes = self.cross_vote(sequences, bin_sites, fit_batch_size,
+                                pre_batch_size, random_state, n_jobs)
         profiles = self.smooth(votes)
         return profiles
 
@@ -316,7 +311,8 @@ class RegressionModel(object):
                  regressor_params=dict(),
                  smoothing_params=dict(),
                  two_steps_opt=False,
-                 batch_size=10000,
+                 fit_batch_size=500,
+                 pre_batch_size=200,
                  fit_with_opt_params=False,
                  max_total_time=-1,
                  random_state=1234,
@@ -430,7 +426,8 @@ class RegressionModel(object):
                 try:
                     opt_sequences, opt_sequences_ = tee(opt_sequences)
                     votes = self.cross_vote(opt_sequences_, bin_sites,
-                                            batch_size, random_state, n_jobs)
+                                            fit_batch_size, pre_batch_size,
+                                            random_state, n_jobs)
                 except Exception as e:
                     logger.debug("Exception", exc_info=True)
                     delta_time = datetime.timedelta(
@@ -535,7 +532,7 @@ class RegressionModel(object):
         if n_failures < n_iter * n_smoothing_iter:
             self.is_optimized = True
             if fit_with_opt_params is True:
-                self._fit(sequences, bin_sites, batch_size,
+                self._fit(sequences, bin_sites, fit_batch_size,
                           random_state, n_jobs)
                 self.is_fitted = True
                 self.save(model_name)

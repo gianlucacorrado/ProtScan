@@ -35,8 +35,8 @@ def random_partition(int_range, n_splits, random_state=1234):
 
 def random_partition_iter(iterable, n_splits, random_state=1234):
     """Partition a generator in a random way (should mantain the unbalance)."""
-    size_iterable, iterable = tee(iterable)
-    size = iterator_size(iterable)
+    iterable, iterable_ = tee(iterable)
+    size = iterator_size(iterable_)
     part_ids = random_partition(size, n_splits=n_splits,
                                 random_state=random_state)
     parts = list()
