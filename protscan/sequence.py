@@ -370,7 +370,7 @@ def split_iterator(iterable, **params):
                     attr_out['length'] = window
                     attr_out['center'] = common.center(
                         attr_out['start'], attr_out['end'])
-                    yield (attr_out, seq_out)
+                    yield attr_out, seq_out
 
 
 def _min_dist(center, bins):
@@ -455,6 +455,7 @@ def sequence_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
 
     if which_set == 'train':
         split = add_distance(split, bin_sites)
+
     return split
 
 

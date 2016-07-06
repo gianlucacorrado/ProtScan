@@ -14,7 +14,7 @@ from collections import defaultdict
 from sklearn.linear_model import SGDRegressor
 from sklearn.metrics import roc_auc_score
 
-from eden.util import vectorize, serialize_dict, iterator_size
+from eden.util import vectorize, serialize_dict
 
 import protscan.sequence as seq
 from eden.sequence import Vectorizer as SeqVectorizer
@@ -167,11 +167,10 @@ class RegressionModel(object):
                                          random_state=random_state,
                                          **self.preprocessor_args)
         preprocessed, preprocessed_ = tee(preprocessed)
-        size = iterator_size(preprocessed_)
+        size = sum(1 for _ in preprocessed_)
         n_splits = max(1, size / batch_size)
         parts = random_partition_iter(preprocessed, n_splits, random_state)
-        parts, parts_ = tee(parts)
-        n_parts = iterator_size(parts_)
+        n_parts = len(parts)
         logger.debug("Fitting (%d batch%s)..." %
                      (n_parts, "es" * (n_parts > 1)))
         for i, part in enumerate(parts):
@@ -208,11 +207,10 @@ class RegressionModel(object):
             raise NotImplementedError("Implement full graph iterator.")
 
         preprocessed, preprocessed_ = tee(preprocessed)
-        size = iterator_size(preprocessed_)
+        size = sum(1 for _ in preprocessed_)
         n_splits = max(1, size / batch_size)
         parts = random_partition_iter(preprocessed, n_splits, random_state)
-        parts, parts_ = tee(parts)
-        n_parts = iterator_size(parts_)
+        n_parts = len(parts)
         logger.debug("Predicting (%d batch%s)..." %
                      (n_parts, "es" * (n_parts > 1)))
         votes = dict()
