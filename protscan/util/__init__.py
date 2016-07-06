@@ -2,8 +2,9 @@
 
 import random
 from itertools import tee, izip
+from collections import deque
 import numpy as np
-from eden.util import selection_iterator, iterator_size
+from eden.util import selection_iterator
 
 __author__ = "Gianluca Corrado"
 __copyright__ = "Copyright 2016, Gianluca Corrado"
@@ -11,6 +12,15 @@ __license__ = "MIT"
 __maintainer__ = "Gianluca Corrado"
 __email__ = "gianluca.corrado@unitn.it"
 __status__ = "Production"
+
+
+def iterator_size(iterable):
+    """Length of an iterator."""
+    if hasattr(iterable, '__len__'):
+        return len(iterable)
+
+    d = deque(enumerate(iterable, 1), maxlen=1)
+    return d[0][0] if d else 0
 
 
 def random_partition(int_range, n_splits, random_state=1234):

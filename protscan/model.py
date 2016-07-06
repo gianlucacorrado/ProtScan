@@ -23,7 +23,7 @@ import protscan.graph as graph
 from eden.graph import Vectorizer as GraphVectorizer
 
 import protscan.common as common
-from protscan.util import random_partition_iter
+from protscan.util import random_partition_iter, iterator_size
 from protscan.util import balanced_fraction, balanced_split
 from protscan.util import additive_update
 
@@ -167,7 +167,7 @@ class RegressionModel(object):
                                          random_state=random_state,
                                          **self.preprocessor_args)
         preprocessed, preprocessed_ = tee(preprocessed)
-        size = sum(1 for _ in preprocessed_)
+        size = iterator_size(preprocessed_)
         n_splits = max(1, size / batch_size)
         parts = random_partition_iter(preprocessed, n_splits, random_state)
         n_parts = len(parts)
@@ -207,7 +207,7 @@ class RegressionModel(object):
             raise NotImplementedError("Implement full graph iterator.")
 
         preprocessed, preprocessed_ = tee(preprocessed)
-        size = sum(1 for _ in preprocessed_)
+        size = iterator_size(preprocessed_)
         n_splits = max(1, size / batch_size)
         parts = random_partition_iter(preprocessed, n_splits, random_state)
         n_parts = len(parts)
