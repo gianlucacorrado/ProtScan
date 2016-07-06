@@ -370,7 +370,7 @@ def split_iterator(iterable, **params):
                     attr_out['length'] = window
                     attr_out['center'] = common.center(
                         attr_out['start'], attr_out['end'])
-                    yield attr_out, seq_out
+                    yield (attr_out, seq_out)
 
 
 def _min_dist(center, bins):
