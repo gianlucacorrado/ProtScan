@@ -110,16 +110,40 @@ class RegressionModel(object):
     def get_parameters(self):
         """Return current parameter setting."""
         text = []
-        text.append('\n\tModel parameters:')
-        text.append('\nmax_dist: %s' % self.max_dist)
-        text.append('\nPreprocessing:')
+        text.append("-" * 80)
+        text.append("max_dist: %s" % self.max_dist)
+        text.append("\nPreprocessing:")
         text.append(serialize_dict(self.preprocessor_args))
-        text.append('\nVectorizer:')
+        text.append("\nVectorizer:")
         text.append(serialize_dict(self.vectorizer_args))
-        text.append('\nRegressor:')
+        text.append("\nRegressor:")
         text.append(serialize_dict(self.regressor_args))
-        text.append('\nSmoothing:')
+        text.append("\nSmoothing:")
         text.append(serialize_dict(self.smoothing_args))
+        text.append("-" * 80)
+        return '\n'.join(text)
+
+    def get_outer_parameters(self):
+        """Return current outer parameter setting."""
+        text = []
+        text.append("-" * 80)
+        text.append("max_dist: %s" % self.max_dist)
+        text.append("\nPreprocessing:")
+        text.append(serialize_dict(self.preprocessor_args))
+        text.append("\nVectorizer:")
+        text.append(serialize_dict(self.vectorizer_args))
+        text.append("\nRegressor:")
+        text.append(serialize_dict(self.regressor_args))
+        text.append("-" * 80)
+        return '\n'.join(text)
+
+    def get_inner_parameters(self):
+        """Return current inner parameter setting."""
+        text = []
+        text.append("-" * 80)
+        text.append("Smoothing:")
+        text.append(serialize_dict(self.smoothing_args))
+        text.append("-" * 80)
         return '\n'.join(text)
 
     def get_supervised_data(self, sequences, bin_sites, random_state=1234,
@@ -379,6 +403,7 @@ class RegressionModel(object):
         else:
             # main iteration
             for i in range(n_iter):
+                logger.debug("\nIteration %d" % (i + 1))
                 if max_total_time != -1:
                     if time.time() - start > max_total_time:
                         delta_time = datetime.timedelta(
@@ -423,6 +448,7 @@ class RegressionModel(object):
                     self.preprocessor_args = self._sample(preprocessor_params)
                     self.vectorizer_args = self._sample(vectorizer_params)
                     self.regressor_args = self._sample(regressor_params)
+
                 try:
                     opt_sequences, opt_sequences_ = tee(opt_sequences)
                     votes = self.cross_vote(opt_sequences_, bin_sites,
@@ -454,6 +480,7 @@ class RegressionModel(object):
                     # for the other iterations, sample the parameters
                     else:
                         self.smoothing_args = self._sample(smoothing_params)
+
                     try:
                         score = self.score_from_votes(votes, bin_sites)
                     except Exception as e:
@@ -508,16 +535,19 @@ class RegressionModel(object):
                         delta_time = datetime.timedelta(
                             seconds=(time.time() - start))
                         text = []
+                        text.append("*" * 80)
+                        text.append("New best solution found:")
                         text.append(
-                            "\n\n\tIteration: %d/%d (after %.1f sec; %s)" %
+                            "\tIteration: %d/%d (after %.1f sec; %s)" %
                             (i + 1, n_iter, time.time() - start,
                              str(delta_time)))
                         text.append(
-                            "\n\tSmoothing iteration: %d/%d" %
+                            "\tSmoothing iteration: %d/%d" %
                             (smoothing_i + 1, n_smoothing_iter))
+                        text.append(self.get_parameters())
                         text.append(
                             "Best score (AUC ROC): %.3f" % best_score_)
-                        text.append(self.get_parameters())
+                        text.append("*" * 80)
                         logger.info('\n'.join(text))
 
             # store the best param configuration and save the model
@@ -537,9 +567,11 @@ class RegressionModel(object):
                 self.is_fitted = True
                 self.save(model_name)
                 logger.info("Model fitted using best param configuration.")
+                logger.info(self.get_parameters())
             else:
                 self.save(model_name)
-                logger.info("Best params configuration saved,")
+                logger.info("Best params configuration saved:")
+                logger.info(self.get_parameters())
                 logger.info("Model requires fit.")
 
         else:

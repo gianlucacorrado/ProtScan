@@ -20,7 +20,10 @@ def iterator_size(iterable):
         return len(iterable)
 
     d = deque(enumerate(iterable, 1), maxlen=1)
-    return d[0][0] if d else 0
+    if d:
+        return d[0][0]
+    else:
+        return 0
 
 
 def random_partition(int_range, n_splits, random_state=1234):
