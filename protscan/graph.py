@@ -378,22 +378,24 @@ def _transform_dictionary(graphs):
 def _graph_preprocessor(graphs, which_set, bin_sites=None, max_dist=None,
                         random_state=1234, **params):
     """Preprocess graphs."""
-    assert which_set == 'train' or \
-        which_set == 'test' or \
-        which_set == 'onlyfold', \
-        "which_set must be 'train', 'test' or 'onlyfold'."
-
-    # return a dictionary with the folded structures (no splitting).
-    if which_set == 'onlyfold':
-        return _transform_dictionary(graphs)
-
     if which_set == 'train':
         graphs = add_distance(graphs, bin_sites)
         graphs = train_selector(
             graphs, bin_sites, max_dist, random_state, **params)
 
-    graphs = split_iterator(graphs, **params)
-    return graphs
+        graphs = split_iterator(graphs, **params)
+        return graphs
+    elif which_set == 'test':
+        graphs = split_iterator(graphs, **params)
+        return graphs
+    elif which_set == 'vote':
+        graphs, graphs_ = tee(graphs)
+        full_graphs = _transform_dictionary(graphs_)
+        graphs = split_iterator(graphs, **params)
+        return full_graphs, graphs
+    else:
+        raise Exception("ERROR: unrecognized which_set type: %s" %
+                        which_set)
 
 
 def rnafold_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,

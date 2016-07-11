@@ -188,6 +188,27 @@ class RegressionModel(object):
 
         return matrix, info
 
+    def get_graph_predict_data(self, sequences, n_jobs=-1):
+        """Feature matrix, subseq info and folded structure."""
+        def _subdict(dic):
+            subdict = dict((k, dic[k]) for k in [
+                           'tr_name', 'center', 'tr_len'] if k in dic)
+            return subdict
+        full_graphs, preprocessed = self.preprocessor(sequences,
+                                                      which_set='vote',
+                                                      **self.preprocessor_args)
+        preprocessed, preprocessed_ = tee(preprocessed)
+        if self.mode == 'sequence':
+            info = [_subdict(attr) for attr, _ in preprocessed_]
+        else:
+            info = [_subdict(g.graph['id']) for g in preprocessed_]
+
+        self.vectorizer.set_params(**self.vectorizer_args)
+        matrix = vectorize(preprocessed, vectorizer=self.vectorizer,
+                           block_size=200, n_jobs=n_jobs)
+
+        return full_graphs, matrix, info
+
     def _fit(self, sequences, bin_sites, fit_batch_size=500,
              random_state=1234, n_jobs=-1):
         """Fit the regressor (using partial fit)."""
@@ -236,16 +257,18 @@ class RegressionModel(object):
         for i, part in enumerate(parts):
             start_time = time.time()
             part, part_ = tee(part)
-            matrix, info = self.get_predict_data(part, n_jobs)
-            pred_vals = self.regressor.predict(matrix)
             if self.mode == 'sequence':
+                matrix, info = self.get_predict_data(part, n_jobs)
+                pred_vals = self.regressor.predict(matrix)
                 part_votes = self.vote_aggregator(pred_vals, info,
                                                   self.max_dist)
             else:
-                raise NotImplementedError("Implement full graph iterator.")
-                # part_votes = self.vote_aggregator(pred_vals, info,
-                #                                   self.max_dist,
-                #                                   full_graphs)
+                full_graphs, matrix, info = self.get_graph_predict_data(
+                    part, n_jobs)
+                pred_vals = self.regressor.predict(matrix)
+                part_votes = self.vote_aggregator(pred_vals, info,
+                                                  self.max_dist,
+                                                  full_graphs)
             additive_update(votes, part_votes)
             delta_time = datetime.timedelta(
                 seconds=(time.time() - start_time))
