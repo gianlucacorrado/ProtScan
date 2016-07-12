@@ -146,15 +146,10 @@ class RegressionModel(object):
         text.append("-" * 80)
         return '\n'.join(text)
 
-    def get_supervised_data(self, sequences, bin_sites, random_state=1234,
+    def get_supervised_data(self, preprocessed, bin_sites,
+                            active_learning=False, random_state=1234,
                             n_jobs=-1):
         """Compute the feature matrix and the regression values."""
-        preprocessed = self.preprocessor(sequences,
-                                         which_set='train',
-                                         bin_sites=bin_sites,
-                                         max_dist=self.max_dist,
-                                         random_state=random_state,
-                                         **self.preprocessor_args)
         preprocessed, preprocessed_ = tee(preprocessed)
         if self.mode == 'sequence':
             dists = [attr['dist'] for attr, _ in preprocessed_]
@@ -210,7 +205,7 @@ class RegressionModel(object):
         return full_graphs, matrix, info
 
     def _fit(self, sequences, bin_sites, fit_batch_size=500,
-             random_state=1234, n_jobs=-1):
+             active_learning=False, random_state=1234, n_jobs=-1):
         """Fit the regressor (using partial fit)."""
         self.regressor.set_params(**self.regressor_args)
         sequences, sequences_ = tee(sequences)
@@ -222,8 +217,30 @@ class RegressionModel(object):
                      (n_parts, "es" * (n_parts > 1)))
         for i, part in enumerate(parts):
             start_time = time.time()
-            matrix, vals = self.get_supervised_data(part, bin_sites,
-                                                    random_state, n_jobs)
+            preprocessed = self.preprocessor(sequences,
+                                             which_set='train',
+                                             bin_sites=bin_sites,
+                                             max_dist=self.max_dist,
+                                             random_state=random_state,
+                                             **self.preprocessor_args)
+            if active_learning is True:
+                # features of all the splits (with regression values)
+                full_matrix, full_vals = self.get_supervised_data(
+                    part, bin_sites, random_state, n_jobs)
+                # random selection of negative examples
+                pos_matrix = full_matrix[full_vals > 0.0]
+                pos_values = full_vals[full_vals > 0.0]
+                neg_matrix = full_matrix[full_vals == 0.0]
+                neg_values = full_vals[full_vals == 0.0]
+                n_pos = len(pos_values)
+                n_neg = len(neg_values)
+                # pick stuff at random!!!!
+            else:
+                # random selection of negative splits
+                raise NotImplementedError
+                # features of selected splits (with regression values)
+                matrix, vals = self.get_supervised_data(
+                    part, bin_sites, random_state, n_jobs)
             if i == 0:
                 # initialize regressor weights
                 self.regressor.fit(matrix, vals)
@@ -236,10 +253,14 @@ class RegressionModel(object):
 
         logger.debug("Done!")
 
+        if active_learning:
+            pred_vals = self.regressor.predict(full_matrix)
+
     def fit(self, sequences, bin_sites, model_name, fit_batch_size=500,
-            random_state=1234, n_jobs=-1):
+            active_learning=False, random_state=1234, n_jobs=-1):
         """Fit the regressor (using partial fit), and save the model."""
-        self._fit(sequences, bin_sites, fit_batch_size, random_state, n_jobs)
+        self._fit(sequences, bin_sites, fit_batch_size,
+                  active_learning, random_state, n_jobs)
         self.is_fitted = True
         self.save(model_name)
 

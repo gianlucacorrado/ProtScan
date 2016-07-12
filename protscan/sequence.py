@@ -1,8 +1,9 @@
 """Functions for sequence based target prediction."""
 
-from itertools import izip, tee
-import random
-from math import ceil
+from itertools import izip
+# from itertools import tee
+# import random
+# from math import ceil
 import numpy as np
 
 import protscan.common as common
@@ -15,318 +16,318 @@ __email__ = "gianluca.corrado@unitn.it"
 __status__ = "Production"
 
 
-def get_positive_subseq(bin_center, max_dist, split_window, tr_len):
-    """Compute the start and end coordinates of a positive subsequence.
+# def get_positive_subseq(bin_center, max_dist, split_window, tr_len):
+#     """Compute the start and end coordinates of a positive subsequence.
 
-    Parameters
-    ----------
-    bin_center : int
-        Cernter of a binding site.
+#     Parameters
+#     ----------
+#     bin_center : int
+#         Cernter of a binding site.
 
-    max_dist : int
-        Maximum distance from a binding site to be considered relevant.
+#     max_dist : int
+#         Maximum distance from a binding site to be considered relevant.
 
-    split_window : int
-        Window size of the split_iterator.
+#     split_window : int
+#         Window size of the split_iterator.
 
-    tr_len : int
-        Lenght of the trascript.
+#     tr_len : int
+#         Lenght of the trascript.
 
-    Returns
-    -------
-    start : int
-        Starting position of the positive subsequence.
-    end : int
-        Ending position of the positive subsequence.
-    """
-    start = max(0, bin_center - max_dist - split_window / 2 + 1)
-    end = min(bin_center + max_dist +
-              int(ceil(float(split_window) / 2)) - 1, tr_len)
-    return start, end
-
-
-def get_left_border_subseq(prevbin_center, bin_center, max_dist, split_window):
-    """Compute the start and end coordinates of a left border subsequence.
-
-    Parameters
-    ----------
-    prevbin_center : int
-        Center of the previous binding site.
-
-    bin_center : int
-        Center of the binding site.
-
-    max_dist : int
-        Maximum distance from a binding site to be considered relevant.
-
-    split_window : int
-        Window size of the split_iterator.
-
-    Returns
-    -------
-    start : int
-        Starting position of the left border subsequence (None if there is
-        no space for the border split, e.g. another binding site is too close).
-    end : int
-        Ending position of the left border subsequence. (None if there is
-        no space for the border split, e.g. another binding site is too close).
-    """
-    # ASSUMPTION: bins are sorted, no binding sites in between
-    if prevbin_center < bin_center:
-        if prevbin_center is None:
-            left_limit = 0
-        else:
-            left_limit = prevbin_center + max_dist + \
-                int(ceil(float(split_window) / 2))
-        end = bin_center - max_dist + int(ceil(float(split_window) / 2))
-        start = end - max_dist
-        if start >= left_limit:
-            return start, end
-    return None, None
+#     Returns
+#     -------
+#     start : int
+#         Starting position of the positive subsequence.
+#     end : int
+#         Ending position of the positive subsequence.
+#     """
+#     start = max(0, bin_center - max_dist - split_window / 2 + 1)
+#     end = min(bin_center + max_dist +
+#               int(ceil(float(split_window) / 2)) - 1, tr_len)
+#     return start, end
 
 
-def get_right_border_subseq(bin_center, nextbin_center, max_dist, split_window,
-                            tr_len):
-    """Compute the start and end coordinates of a left border subsequence.
+# def get_left_border_subseq(prevbin_center, bin_center, max_dist, split_window):
+#     """Compute the start and end coordinates of a left border subsequence.
 
-    Parameters
-    ----------
-    bin_center : int
-        Center of the binding site.
+#     Parameters
+#     ----------
+#     prevbin_center : int
+#         Center of the previous binding site.
 
-    nextbin_start : int
-        Center of the next binding site.
+#     bin_center : int
+#         Center of the binding site.
 
-    max_dist : int
-        Maximum distance from a binding site to be considered relevant.
+#     max_dist : int
+#         Maximum distance from a binding site to be considered relevant.
 
-    split_window : int
-        Window size of the split_iterator.
+#     split_window : int
+#         Window size of the split_iterator.
 
-    tr_len : int
-        Lenght of the trascript.
-
-    Returns
-    -------
-    start : int
-        Starting position of the right border subsequence (None if there is
-        no space for the border split, e.g. another binding site is too close).
-    end : int
-        Ending position of the right border subsequence. (None if there is
-        no space for the border split, e.g. another binding site is too close).
-    """
-    # ASSUMPTION: bins are sorted, no binding sites in between
-    if bin_center < nextbin_center or nextbin_center is None:
-        if nextbin_center is None:
-            right_limit = tr_len
-        else:
-            right_limit = nextbin_center - max_dist - split_window / 2
-        start = bin_center + max_dist - split_window / 2
-        end = start + max_dist
-        if end <= right_limit:
-            return start, end
-    return None, None
+#     Returns
+#     -------
+#     start : int
+#         Starting position of the left border subsequence (None if there is
+#         no space for the border split, e.g. another binding site is too close).
+#     end : int
+#         Ending position of the left border subsequence. (None if there is
+#         no space for the border split, e.g. another binding site is too close).
+#     """
+#     # ASSUMPTION: bins are sorted, no binding sites in between
+#     if prevbin_center < bin_center:
+#         if prevbin_center is None:
+#             left_limit = 0
+#         else:
+#             left_limit = prevbin_center + max_dist + \
+#                 int(ceil(float(split_window) / 2))
+#         end = bin_center - max_dist + int(ceil(float(split_window) / 2))
+#         start = end - max_dist
+#         if start >= left_limit:
+#             return start, end
+#     return None, None
 
 
-def get_negative_subseqs(bin1_center, bin2_center, max_dist, split_window,
-                         tr_len, negative_ratio=1, random_state=1234):
-    """Negative subsequences between binding sites.
+# def get_right_border_subseq(bin_center, nextbin_center, max_dist, split_window,
+#                             tr_len):
+#     """Compute the start and end coordinates of a left border subsequence.
 
-    Parameters
-    ----------
-    bin1_center : int
-        Center of a binding site.
+#     Parameters
+#     ----------
+#     bin_center : int
+#         Center of the binding site.
 
-    bin2_center : int
-        Center of the consecutive binding site of bin1. I.e. no
-        binding sites in between.
+#     nextbin_start : int
+#         Center of the next binding site.
 
-    max_dist : int
-        Maximum distance from a binding site to be considered relevant.
+#     max_dist : int
+#         Maximum distance from a binding site to be considered relevant.
 
-    split_window : int
-        Window size of the split_iterator.
+#     split_window : int
+#         Window size of the split_iterator.
 
-    tr_len : int
-        Lenght of the trascript.
+#     tr_len : int
+#         Lenght of the trascript.
 
-    negative_ratio : float (default : 1)
-        Maximum nucleotide ratio for the negative splits. This parameter
-        controls the number of the negative splits to be sampled.
-        The total length (in nucleotides) of all the negative splits
-        is computed as: max_dist * negative_ratio
-        Negative splits may overlap.
-
-    random_state : int (default : 1234)
-        Seed for RNG that controls the sampling of the negative splits.
-
-    Returns
-    -------
-    splits : list
-        List of (start, end) potions of the negative subsequences.
-    """
-    # ASSUMPTION: bins are sorted, no binding sites in between
-    if bin1_center < bin2_center or bin2_center is None:
-        if bin1_center is None:
-            left_limit = 0
-        else:
-            left_limit = bin1_center + 2 * max_dist - split_window / 2
-        if bin2_center is None:
-            right_limit = tr_len
-        else:
-            right_limit = bin2_center - 2 * max_dist + \
-                int(ceil(float(split_window) / 2))
-        neg_window = max(0, right_limit - left_limit)
-        if neg_window >= 2 * max_dist + split_window - 2:
-            choices = list()
-            for _ in range(negative_ratio):
-                choices.append(
-                    int(random.triangular(left_limit + max_dist +
-                                          split_window / 2,
-                                          right_limit - max_dist -
-                                          split_window / 2)))
-
-            splits = [(c - max_dist - split_window / 2 + 1, c +
-                       max_dist + split_window / 2 - 1) for c in choices]
-            return splits
-    return [(None, None)]
+#     Returns
+#     -------
+#     start : int
+#         Starting position of the right border subsequence (None if there is
+#         no space for the border split, e.g. another binding site is too close).
+#     end : int
+#         Ending position of the right border subsequence. (None if there is
+#         no space for the border split, e.g. another binding site is too close).
+#     """
+#     # ASSUMPTION: bins are sorted, no binding sites in between
+#     if bin_center < nextbin_center or nextbin_center is None:
+#         if nextbin_center is None:
+#             right_limit = tr_len
+#         else:
+#             right_limit = nextbin_center - max_dist - split_window / 2
+#         start = bin_center + max_dist - split_window / 2
+#         end = start + max_dist
+#         if end <= right_limit:
+#             return start, end
+#     return None, None
 
 
-def train_selector(sequences, bin_sites, max_dist, random_state=1234,
-                   **params):
-    """Select training subsequences from RNA sequences.
+# def get_negative_subseqs(bin1_center, bin2_center, max_dist, split_window,
+#                          tr_len, negative_ratio=1, random_state=1234):
+#     """Negative subsequences between binding sites.
 
-    Parameters
-    ----------
-    sequences : iterable
-        RNA sequences (yielded from fasta_to_seq).
+#     Parameters
+#     ----------
+#     bin1_center : int
+#         Center of a binding site.
 
-    bin_sites : dict
-        Binding site regions (from bed_to_dictionary).
+#     bin2_center : int
+#         Center of the consecutive binding site of bin1. I.e. no
+#         binding sites in between.
 
-    max_dist : int
-        Maximum distance from a binding site to be considered relevant.
+#     max_dist : int
+#         Maximum distance from a binding site to be considered relevant.
 
-    random_state : int (default : 1234)
-        Seed for RNG that controls the sampling of the negative splits.
+#     split_window : int
+#         Window size of the split_iterator.
 
-    **params : dict
-        Dictionary of pre_processing parameters.
+#     tr_len : int
+#         Lenght of the trascript.
 
-    Returns
-    -------
-    attr : dict
-        Sequence information. tr_name: name of the sequence in the fasta file,
-        tr_length: lenght of the transcript, lenght: lenght of the subsequence,
-        start: starting position of the subsequence, end: ending position of
-        the subsequence, type: class of the subsequence (either 'POS', 'NEG' or
-        'BOR').
-    subseq : str
-        Subsequence.
-    """
-    negative_ratio = params.get('negative_ratio', 1)
-    split_window = params.get('split_window', 50)
+#     negative_ratio : float (default : 1)
+#         Maximum nucleotide ratio for the negative splits. This parameter
+#         controls the number of the negative splits to be sampled.
+#         The total length (in nucleotides) of all the negative splits
+#         is computed as: max_dist * negative_ratio
+#         Negative splits may overlap.
 
-    non_binding = 0
-    negative_remainder = 0
-    sequences, sequences_ = tee(sequences)
+#     random_state : int (default : 1234)
+#         Seed for RNG that controls the sampling of the negative splits.
 
-    for attr, seq in sequences_:
-        bins = bin_sites.get(attr['tr_name'].split('.')[0], False)
-        if bins is False:
-            non_binding += 1
-            continue
-        tr_len = attr['tr_len']
-        # iterate over couples of consecutive binding sites (bins are sorted)
-        iterator = izip([(None, None, None)] + bins[:-1], bins, bins[1:] +
-                        [(None, None, None)])
-        for (_, _, prevbin_center), (_, _, bin_center),\
-                (_, _, nextbin_center) in iterator:
-            for start, end in get_negative_subseqs(
-                    prevbin_center, bin_center, max_dist, split_window,
-                    tr_len, negative_ratio, random_state):
-                if start is not None and end is not None:
-                    subseq = seq[start:end]
-                    new_attr = attr.copy()
-                    new_attr['start'] = start
-                    new_attr['end'] = end
-                    new_attr['length'] = end - start
-                    new_attr['type'] = 'NEG'
-                    yield new_attr, subseq
-                else:
-                    negative_remainder += negative_ratio
+#     Returns
+#     -------
+#     splits : list
+#         List of (start, end) potions of the negative subsequences.
+#     """
+#     # ASSUMPTION: bins are sorted, no binding sites in between
+#     if bin1_center < bin2_center or bin2_center is None:
+#         if bin1_center is None:
+#             left_limit = 0
+#         else:
+#             left_limit = bin1_center + 2 * max_dist - split_window / 2
+#         if bin2_center is None:
+#             right_limit = tr_len
+#         else:
+#             right_limit = bin2_center - 2 * max_dist + \
+#                 int(ceil(float(split_window) / 2))
+#         neg_window = max(0, right_limit - left_limit)
+#         if neg_window >= 2 * max_dist + split_window - 2:
+#             choices = list()
+#             for _ in range(negative_ratio):
+#                 choices.append(
+#                     int(random.triangular(left_limit + max_dist +
+#                                           split_window / 2,
+#                                           right_limit - max_dist -
+#                                           split_window / 2)))
 
-            # left border
-            start, end = get_left_border_subseq(
-                prevbin_center, bin_center, max_dist, split_window)
-            if start is not None and end is not None:
-                subseq = seq[start:end]
-                new_attr = attr.copy()
-                new_attr['start'] = start
-                new_attr['end'] = end
-                new_attr['length'] = end - start
-                new_attr['type'] = 'BOR'
-                yield new_attr, subseq
+#             splits = [(c - max_dist - split_window / 2 + 1, c +
+#                        max_dist + split_window / 2 - 1) for c in choices]
+#             return splits
+#     return [(None, None)]
 
-            # positive
-            start, end = get_positive_subseq(
-                bin_center, max_dist, split_window, tr_len)
-            subseq = seq[start:end]
-            new_attr = attr.copy()
-            new_attr['start'] = start
-            new_attr['end'] = end
-            new_attr['length'] = end - start
-            new_attr['type'] = 'POS'
-            yield new_attr, subseq
 
-            # right border
-            start, end = get_right_border_subseq(
-                bin_center, nextbin_center, max_dist, split_window, tr_len)
-            if start is not None and end is not None:
-                subseq = seq[start:end]
-                new_attr = attr.copy()
-                new_attr['start'] = start
-                new_attr['end'] = end
-                new_attr['length'] = end - start
-                new_attr['type'] = 'BOR'
-                yield new_attr, subseq
+# def train_selector(sequences, bin_sites, max_dist, random_state=1234,
+#                    **params):
+#     """Select training subsequences from RNA sequences.
 
-            # # negative (only for the last iteration)
-            # if nextbin_center is None:
-            #     for start, end in get_negative_subseqs(
-            #             bin_center, nextbin_center, max_dist, split_window,
-            #             tr_len, negative_ratio, random_state):
-            #         if start is not None and end is not None:
-            #             subseq = seq[start:end]
-            #             new_attr = attr.copy()
-            #             new_attr['start'] = start
-            #             new_attr['end'] = end
-            #             new_attr['length'] = end - start
-            #             new_attr['type'] = 'NEG'
-            #             yield new_attr, subseq
-            #         else:
-            #             negative_remainder += negative_ratio
+#     Parameters
+#     ----------
+#     sequences : iterable
+#         RNA sequences (yielded from fasta_to_seq).
 
-    # account for the missing negative sequences
-    if negative_remainder > 0 and non_binding > 0:
-        new_negative_ratio = int(
-            ceil(float(negative_remainder) / non_binding))
-        for attr, seq in sequences:
-            bins = bin_sites.get(attr['tr_name'].split('.')[0], False)
-            tr_len = attr['tr_len']
-            if bins is False and negative_remainder > 1:
-                for start, end in get_negative_subseqs(
-                        None, None, max_dist, split_window, tr_len,
-                        new_negative_ratio, random_state):
-                    if start is not None and end is not None:
-                        subseq = seq[start:end]
-                        new_attr = attr.copy()
-                        new_attr['start'] = start
-                        new_attr['end'] = end
-                        new_attr['length'] = end - start
-                        new_attr['type'] = 'NEG'
-                        negative_remainder -= 1
-                        yield new_attr, subseq
+#     bin_sites : dict
+#         Binding site regions (from bed_to_dictionary).
+
+#     max_dist : int
+#         Maximum distance from a binding site to be considered relevant.
+
+#     random_state : int (default : 1234)
+#         Seed for RNG that controls the sampling of the negative splits.
+
+#     **params : dict
+#         Dictionary of pre_processing parameters.
+
+#     Returns
+#     -------
+#     attr : dict
+#         Sequence information. tr_name: name of the sequence in the fasta file,
+#         tr_length: lenght of the transcript, lenght: lenght of the subsequence,
+#         start: starting position of the subsequence, end: ending position of
+#         the subsequence, type: class of the subsequence (either 'POS', 'NEG' or
+#         'BOR').
+#     subseq : str
+#         Subsequence.
+#     """
+#     negative_ratio = params.get('negative_ratio', 1)
+#     split_window = params.get('split_window', 50)
+
+#     non_binding = 0
+#     negative_remainder = 0
+#     sequences, sequences_ = tee(sequences)
+
+#     for attr, seq in sequences_:
+#         bins = bin_sites.get(attr['tr_name'].split('.')[0], False)
+#         if bins is False:
+#             non_binding += 1
+#             continue
+#         tr_len = attr['tr_len']
+#         # iterate over couples of consecutive binding sites (bins are sorted)
+#         iterator = izip([(None, None, None)] + bins[:-1], bins, bins[1:] +
+#                         [(None, None, None)])
+#         for (_, _, prevbin_center), (_, _, bin_center),\
+#                 (_, _, nextbin_center) in iterator:
+#             for start, end in get_negative_subseqs(
+#                     prevbin_center, bin_center, max_dist, split_window,
+#                     tr_len, negative_ratio, random_state):
+#                 if start is not None and end is not None:
+#                     subseq = seq[start:end]
+#                     new_attr = attr.copy()
+#                     new_attr['start'] = start
+#                     new_attr['end'] = end
+#                     new_attr['length'] = end - start
+#                     new_attr['type'] = 'NEG'
+#                     yield new_attr, subseq
+#                 else:
+#                     negative_remainder += negative_ratio
+
+#             # left border
+#             start, end = get_left_border_subseq(
+#                 prevbin_center, bin_center, max_dist, split_window)
+#             if start is not None and end is not None:
+#                 subseq = seq[start:end]
+#                 new_attr = attr.copy()
+#                 new_attr['start'] = start
+#                 new_attr['end'] = end
+#                 new_attr['length'] = end - start
+#                 new_attr['type'] = 'BOR'
+#                 yield new_attr, subseq
+
+#             # positive
+#             start, end = get_positive_subseq(
+#                 bin_center, max_dist, split_window, tr_len)
+#             subseq = seq[start:end]
+#             new_attr = attr.copy()
+#             new_attr['start'] = start
+#             new_attr['end'] = end
+#             new_attr['length'] = end - start
+#             new_attr['type'] = 'POS'
+#             yield new_attr, subseq
+
+#             # right border
+#             start, end = get_right_border_subseq(
+#                 bin_center, nextbin_center, max_dist, split_window, tr_len)
+#             if start is not None and end is not None:
+#                 subseq = seq[start:end]
+#                 new_attr = attr.copy()
+#                 new_attr['start'] = start
+#                 new_attr['end'] = end
+#                 new_attr['length'] = end - start
+#                 new_attr['type'] = 'BOR'
+#                 yield new_attr, subseq
+
+#             # # negative (only for the last iteration)
+#             # if nextbin_center is None:
+#             #     for start, end in get_negative_subseqs(
+#             #             bin_center, nextbin_center, max_dist, split_window,
+#             #             tr_len, negative_ratio, random_state):
+#             #         if start is not None and end is not None:
+#             #             subseq = seq[start:end]
+#             #             new_attr = attr.copy()
+#             #             new_attr['start'] = start
+#             #             new_attr['end'] = end
+#             #             new_attr['length'] = end - start
+#             #             new_attr['type'] = 'NEG'
+#             #             yield new_attr, subseq
+#             #         else:
+#             #             negative_remainder += negative_ratio
+
+#     # account for the missing negative sequences
+#     if negative_remainder > 0 and non_binding > 0:
+#         new_negative_ratio = int(
+#             ceil(float(negative_remainder) / non_binding))
+#         for attr, seq in sequences:
+#             bins = bin_sites.get(attr['tr_name'].split('.')[0], False)
+#             tr_len = attr['tr_len']
+#             if bins is False and negative_remainder > 1:
+#                 for start, end in get_negative_subseqs(
+#                         None, None, max_dist, split_window, tr_len,
+#                         new_negative_ratio, random_state):
+#                     if start is not None and end is not None:
+#                         subseq = seq[start:end]
+#                         new_attr = attr.copy()
+#                         new_attr['start'] = start
+#                         new_attr['end'] = end
+#                         new_attr['length'] = end - start
+#                         new_attr['type'] = 'NEG'
+#                         negative_remainder -= 1
+#                         yield new_attr, subseq
 
 
 def split_iterator(iterable, **params):
@@ -408,7 +409,7 @@ def _min_dist(center, bins):
     return best
 
 
-def add_distance(subsequences, bin_sites):
+def add_supervision(subsequences, bin_sites, max_dist):
     """Per subsequence distance from the closest binding site.
 
     NOTE: sequence based add_distance is suppoded to be called after the
@@ -422,22 +423,33 @@ def add_distance(subsequences, bin_sites):
     bin_sites : dict
         Binding site regions (from bed_to_dictionary).
 
+    max_dist : int
+        Maximum distance from a binding site to be considered relevant.
+
     Returns
     -------
     attr : dict
-        Sequence information. Added 'dist'.
+        Sequence information. Added 'dist' and 'type'.
 
     subseq: str
         Subsequence.
     """
     for attr, subseq in subsequences:
-        try:
-            bins = bin_sites[attr['tr_name'].split('.')[0]]
+        tr_name = attr['tr_name'].split('.')[0]
+        bins = bin_sites.get(tr_name, False)
+        if bins is not False:
             seq_center = attr['center']
             dist = _min_dist(seq_center, bins)
             attr['dist'] = dist
-        except Exception:
+            if dist < max_dist:
+                attr['type'] = 'POS'
+            elif dist == max_dist:
+                attr['type'] = 'BOR'
+            else:
+                attr['type'] = 'NEG'
+        else:
             attr['dist'] = None
+            attr['type'] = 'NEG'
         yield attr, subseq
 
 
@@ -447,20 +459,16 @@ def sequence_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
     assert which_set == 'train' or which_set == 'test', \
         "which_set must be either 'train' or 'test'."
 
-    if which_set == 'train':
-        iterable = train_selector(
-            iterable, bin_sites, max_dist, random_state, **params)
-
     split = split_iterator(iterable, **params)
 
     if which_set == 'train':
-        split = add_distance(split, bin_sites)
+        split = add_supervision(split, bin_sites, max_dist)
 
     return split
 
 
-def print_stats(iterable):
-    """Print number of positive, border, and negative subsequences."""
+def get_stats(iterable):
+    """Get number of positive, border, and negative subsequences."""
     pos = bor = neg = 0
     for attr, seq in iterable:
         if attr['type'] == 'POS':
@@ -472,8 +480,7 @@ def print_stats(iterable):
         else:
             raise Exception("ERROR: unrecognized subsequence type:" +
                             str(attr['type']))
-    print "POS: %i\nBOR: %i\nNEG: %i\nTOT: %i" %\
-        (pos, bor, neg, pos + bor + neg)
+    return pos, bor, neg
 
 
 def vote_aggregator(pred_vals, info, max_dist):
