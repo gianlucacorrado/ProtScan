@@ -7,6 +7,7 @@ import datetime
 import copy
 
 import numpy as np
+from scipy.sparse import vstack
 
 from itertools import tee
 from collections import defaultdict
@@ -15,6 +16,7 @@ from sklearn.linear_model import SGDRegressor
 from sklearn.metrics import roc_auc_score
 
 from eden.util import vectorize, serialize_dict
+from eden.util import selection_iterator
 
 import protscan.sequence as seq
 from eden.sequence import Vectorizer as SeqVectorizer
@@ -24,6 +26,7 @@ from eden.graph import Vectorizer as GraphVectorizer
 
 import protscan.common as common
 from protscan.util import random_partition_iter, iterator_size
+from protscan.util import np_random_permutation
 from protscan.util import balanced_fraction, balanced_split
 from protscan.util import additive_update
 
@@ -217,7 +220,7 @@ class RegressionModel(object):
                      (n_parts, "es" * (n_parts > 1)))
         for i, part in enumerate(parts):
             start_time = time.time()
-            preprocessed = self.preprocessor(sequences,
+            preprocessed = self.preprocessor(part,
                                              which_set='train',
                                              bin_sites=bin_sites,
                                              max_dist=self.max_dist,
@@ -226,35 +229,95 @@ class RegressionModel(object):
             if active_learning is True:
                 # features of all the splits (with regression values)
                 full_matrix, full_vals = self.get_supervised_data(
-                    part, bin_sites, random_state, n_jobs)
+                    preprocessed, bin_sites, random_state, n_jobs)
+
                 # random selection of negative examples
                 pos_matrix = full_matrix[full_vals > 0.0]
-                pos_values = full_vals[full_vals > 0.0]
+                pos_vals = full_vals[full_vals > 0.0]
                 neg_matrix = full_matrix[full_vals == 0.0]
-                neg_values = full_vals[full_vals == 0.0]
-                n_pos = len(pos_values)
-                n_neg = len(neg_values)
-                # pick stuff at random!!!!
+                neg_vals = full_vals[full_vals == 0.0]
+
+                neg_matrix, neg_vals = np_random_permutation(
+                    neg_matrix,
+                    neg_vals,
+                    random_state)
+
+                n_pos = len(pos_vals)
+                negative_ratio = self.preprocessor_args.get('negative_ratio')
+                n_neg = int(n_pos * negative_ratio)
+                matrix = vstack((pos_matrix, neg_matrix[:n_neg]), format='csr')
+                vals = np.concatenate((pos_vals, neg_vals[:n_neg]))
+
+                # fit a temporary regressor with random negatives
+                matrix, vals = np_random_permutation(matrix,
+                                                     vals,
+                                                     random_state)
+                temp_regressor = copy.deepcopy(self.regressor)
+                if i == 0:
+                    # initialize regressor weights
+                    temp_regressor.fit(matrix, vals)
+                else:
+                    temp_regressor.partial_fit(matrix, vals)
+
+                # find negative examples with the highest predicted values
+                pred_neg_vals = temp_regressor.predict(neg_matrix)
+                order = np.argsort(pred_neg_vals)[::-1]
+                neg_matrix = neg_matrix[order]
+                neg_vals = neg_vals[order]
+                matrix = vstack((pos_matrix, neg_matrix[:n_neg]), format='csr')
+                vals = np.concatenate((pos_vals, neg_vals[:n_neg]))
+
+                # fit a the regressor using most the confusing negatives
+                matrix, vals = np_random_permutation(matrix,
+                                                     vals,
+                                                     random_state)
+                if i == 0:
+                    # initialize regressor weights
+                    self.regressor.fit(matrix, vals)
+                else:
+                    self.regressor.partial_fit(matrix, vals)
+
+                delta_time = datetime.timedelta(
+                    seconds=(time.time() - start_time))
+                logger.debug("\tbatch %d/%d, elapsed time: %s" %
+                             (i + 1, n_parts, str(delta_time)))
             else:
                 # random selection of negative splits
-                raise NotImplementedError
+                preprocessed, preprocessed_ = tee(preprocessed)
+                pos_idx, neg_idx = list(), list()
+                for j, (attr, _) in enumerate(preprocessed_):
+                    if attr['type'] == 'POS':
+                        pos_idx.append(j)
+                    else:
+                        neg_idx.append(j)
+
+                np.random.seed(random_state)
+                np.random.shuffle(neg_idx)
+                n_pos = len(pos_idx)
+                negative_ratio = self.preprocessor_args.get('negative_ratio')
+                n_neg = int(n_pos * negative_ratio)
+                idx = np.concatenate((pos_idx, neg_idx[:n_neg]))
+                selected = selection_iterator(preprocessed, idx)
+
                 # features of selected splits (with regression values)
                 matrix, vals = self.get_supervised_data(
-                    part, bin_sites, random_state, n_jobs)
-            if i == 0:
-                # initialize regressor weights
-                self.regressor.fit(matrix, vals)
-            else:
-                self.regressor.partial_fit(matrix, vals)
-            delta_time = datetime.timedelta(
-                seconds=(time.time() - start_time))
-            logger.debug("\tbatch %d/%d, elapsed time: %s" %
-                         (i + 1, n_parts, str(delta_time)))
+                    selected, bin_sites, random_state, n_jobs)
 
+                # fit the regressor with random negatives
+                matrix, vals = np_random_permutation(matrix,
+                                                     vals,
+                                                     random_state)
+                if i == 0:
+                    # initialize regressor weights
+                    self.regressor.fit(matrix, vals)
+                else:
+                    self.regressor.partial_fit(matrix, vals)
+
+                delta_time = datetime.timedelta(
+                    seconds=(time.time() - start_time))
+                logger.debug("\tbatch %d/%d, elapsed time: %s" %
+                             (i + 1, n_parts, str(delta_time)))
         logger.debug("Done!")
-
-        if active_learning:
-            pred_vals = self.regressor.predict(full_matrix)
 
     def fit(self, sequences, bin_sites, model_name, fit_batch_size=500,
             active_learning=False, random_state=1234, n_jobs=-1):
@@ -311,7 +374,8 @@ class RegressionModel(object):
         return profiles
 
     def cross_vote(self, sequences, bin_sites, fit_batch_size=500,
-                   pre_batch_size=200, random_state=1234, n_jobs=-1):
+                   pre_batch_size=200, active_learning=False,
+                   random_state=1234, n_jobs=-1):
         """2-fold cross fit and vote."""
         votes = dict()
         part1, part2 = balanced_split(sequences, bin_sites, n_splits=2,
@@ -323,23 +387,27 @@ class RegressionModel(object):
         # fold 1
         logger.debug("Fold 1")
         tr, te = part1, part2
-        self._fit(tr, bin_sites, fit_batch_size, random_state, n_jobs)
+        self._fit(tr, bin_sites, fit_batch_size, active_learning,
+                  random_state, n_jobs)
         part_votes = self.vote(te, pre_batch_size, random_state, n_jobs)
         votes.update(part_votes)
 
         # fold 2
         logger.debug("Fold 2")
         tr, te = part2_, part1_
-        self._fit(tr, bin_sites, fit_batch_size, random_state, n_jobs)
+        self._fit(tr, bin_sites, fit_batch_size, active_learning,
+                  random_state, n_jobs)
         part_votes = self.vote(te, pre_batch_size, random_state, n_jobs)
         votes.update(part_votes)
         return votes
 
     def cross_predict(self, sequences, bin_sites, fit_batch_size=500,
-                      pre_batch_size=200, random_state=1234, n_jobs=-1):
+                      pre_batch_size=200, active_learning=False,
+                      random_state=1234, n_jobs=-1):
         """2-fold cross fit and predict."""
         votes = self.cross_vote(sequences, bin_sites, fit_batch_size,
-                                pre_batch_size, random_state, n_jobs)
+                                pre_batch_size, active_learning,
+                                random_state, n_jobs)
         profiles = self.smooth(votes)
         return profiles
 
@@ -381,6 +449,7 @@ class RegressionModel(object):
                  two_steps_opt=False,
                  fit_batch_size=500,
                  pre_batch_size=200,
+                 active_learning=False,
                  fit_with_opt_params=False,
                  max_total_time=-1,
                  random_state=1234,
@@ -497,7 +566,8 @@ class RegressionModel(object):
                     opt_sequences, opt_sequences_ = tee(opt_sequences)
                     votes = self.cross_vote(opt_sequences_, bin_sites,
                                             fit_batch_size, pre_batch_size,
-                                            random_state, n_jobs)
+                                            active_learning, random_state,
+                                            n_jobs)
                 except Exception as e:
                     logger.debug("Exception", exc_info=True)
                     delta_time = datetime.timedelta(
@@ -607,7 +677,7 @@ class RegressionModel(object):
             self.is_optimized = True
             if fit_with_opt_params is True:
                 self._fit(sequences, bin_sites, fit_batch_size,
-                          random_state, n_jobs)
+                          active_learning, random_state, n_jobs)
                 self.is_fitted = True
                 self.save(model_name)
                 logger.info("Model fitted using best param configuration.")

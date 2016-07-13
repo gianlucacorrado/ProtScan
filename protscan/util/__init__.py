@@ -133,3 +133,12 @@ def additive_update(dic, to_add):
         else:
             # the values are numpy arrays
             dic.update({k: v.copy()})
+
+
+def np_random_permutation(matrix, vals, random_state=1234):
+    """Random permutation of matrix and values."""
+    np.random.seed(random_state)
+    perm = range(len(vals))
+    np.random.shuffle(perm)
+
+    return matrix[perm], vals[perm]

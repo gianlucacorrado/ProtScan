@@ -55,8 +55,8 @@ def init_preprocessor_params(args):
     n_samples = vars(args).get('n_iter', 0)
     preprocessor_params = {
         'negative_ratio': add_default(
-            3,  # default value
-            np.random.randint(1, 7, size=n_samples)),
+            3.,  # default value
+            np.random.uniform(1., 10., size=n_samples)),
 
         'split_step': add_default(
             3,  # default value
@@ -229,6 +229,10 @@ def argparse_setup(description, epilog):
                             improve the computation time, but it requires more
                             memory.""",
                             default=200)
+    opt_parser.add_argument("-a", "--active-learning",
+                            dest="active_learning",
+                            help="Enable active learning.",
+                            action="store_true")
     opt_parser.add_argument("--fit-opt",
                             dest="fit_with_opt_params",
                             help="""At the end of the optimization phase, fit
@@ -315,6 +319,10 @@ def argparse_setup(description, epilog):
                             improve the computation time, but it requires more
                             memory.""",
                             default=500)
+    fit_parser.add_argument("-a", "--active-learning",
+                            dest="active_learning",
+                            help="Enable active learning.",
+                            action="store_true")
     fit_parser.add_argument("--seed",
                             dest="random_state",
                             type=int,
@@ -453,6 +461,10 @@ def argparse_setup(description, epilog):
                             improve the computation time, but it requires more
                             memory.""",
                             default=200)
+    cpr_parser.add_argument("-a", "--active-learning",
+                            dest="active_learning",
+                            help="Enable active learning.",
+                            action="store_true")
     cpr_parser.add_argument("--seed",
                             dest="random_state",
                             type=int,
@@ -517,6 +529,7 @@ def main_optimize(args):
                    two_steps_opt=args.two_steps_opt,
                    fit_batch_size=args.fit_batch_size,
                    pre_batch_size=args.pre_batch_size,
+                   active_learning=args.active_learning,
                    fit_with_opt_params=args.fit_with_opt_params,
                    max_total_time=args.max_total_time,
                    random_state=args.random_state,
@@ -567,6 +580,7 @@ def main_fit(args):
               bin_sites=bin_sites,
               model_name=args.model_file,
               fit_batch_size=args.fit_batch_size,
+              active_learning=args.active_learning,
               random_state=args.random_state,
               n_jobs=args.n_jobs)
 
@@ -632,6 +646,7 @@ def main_cross_predict(args):
         bin_sites=bin_sites,
         fit_batch_size=args.fit_batch_size,
         pre_batch_size=args.pre_batch_size,
+        active_learning=args.active_learning,
         random_state=args.random_state,
         n_jobs=args.n_jobs)
     f = open(args.output_file, 'w')
