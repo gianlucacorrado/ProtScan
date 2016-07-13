@@ -171,41 +171,27 @@ class RegressionModel(object):
             subdict = dict((k, dic[k]) for k in [
                            'tr_name', 'center', 'tr_len'] if k in dic)
             return subdict
-        preprocessed = self.preprocessor(sequences,
-                                         which_set='test',
-                                         **self.preprocessor_args)
-        preprocessed, preprocessed_ = tee(preprocessed)
         if self.mode == 'sequence':
+            preprocessed = self.preprocessor(sequences,
+                                             which_set='test',
+                                             **self.preprocessor_args)
+            preprocessed, preprocessed_ = tee(preprocessed)
             info = [_subdict(attr) for attr, _ in preprocessed_]
         else:
+            full_graphs, preprocessed = self.preprocessor(
+                sequences,
+                which_set='test',
+                **self.preprocessor_args)
+            preprocessed, preprocessed_ = tee(preprocessed)
             info = [_subdict(g.graph['id']) for g in preprocessed_]
 
         self.vectorizer.set_params(**self.vectorizer_args)
         matrix = vectorize(preprocessed, vectorizer=self.vectorizer,
                            block_size=200, n_jobs=n_jobs)
-
-        return matrix, info
-
-    def get_graph_predict_data(self, sequences, n_jobs=-1):
-        """Feature matrix, subseq info and folded structure."""
-        def _subdict(dic):
-            subdict = dict((k, dic[k]) for k in [
-                           'tr_name', 'center', 'tr_len'] if k in dic)
-            return subdict
-        full_graphs, preprocessed = self.preprocessor(sequences,
-                                                      which_set='vote',
-                                                      **self.preprocessor_args)
-        preprocessed, preprocessed_ = tee(preprocessed)
         if self.mode == 'sequence':
-            info = [_subdict(attr) for attr, _ in preprocessed_]
+            return matrix, info
         else:
-            info = [_subdict(g.graph['id']) for g in preprocessed_]
-
-        self.vectorizer.set_params(**self.vectorizer_args)
-        matrix = vectorize(preprocessed, vectorizer=self.vectorizer,
-                           block_size=200, n_jobs=n_jobs)
-
-        return full_graphs, matrix, info
+            return full_graphs, matrix, info
 
     def _fit(self, sequences, bin_sites, fit_batch_size=500,
              active_learning=False, random_state=1234, n_jobs=-1):
@@ -285,11 +271,18 @@ class RegressionModel(object):
                 # random selection of negative splits
                 preprocessed, preprocessed_ = tee(preprocessed)
                 pos_idx, neg_idx = list(), list()
-                for j, (attr, _) in enumerate(preprocessed_):
-                    if attr['type'] == 'POS':
-                        pos_idx.append(j)
-                    else:
-                        neg_idx.append(j)
+                if self.mode == 'sequence':
+                    for j, (attr, _) in enumerate(preprocessed_):
+                        if attr['type'] == 'POS':
+                            pos_idx.append(j)
+                        else:
+                            neg_idx.append(j)
+                else:
+                    for j, g in enumerate(preprocessed_):
+                        if g.graph['id']['type'] == 'POS':
+                            pos_idx.append(j)
+                        else:
+                            neg_idx.append(j)
 
                 np.random.seed(random_state)
                 np.random.shuffle(neg_idx)
@@ -347,8 +340,7 @@ class RegressionModel(object):
                 part_votes = self.vote_aggregator(pred_vals, info,
                                                   self.max_dist)
             else:
-                full_graphs, matrix, info = self.get_graph_predict_data(
-                    part, n_jobs)
+                full_graphs, matrix, info = self.get_predict_data(part, n_jobs)
                 pred_vals = self.regressor.predict(matrix)
                 part_votes = self.vote_aggregator(pred_vals, info,
                                                   self.max_dist,
