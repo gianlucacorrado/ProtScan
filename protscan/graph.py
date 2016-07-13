@@ -1,16 +1,11 @@
 """Functions for graph based target prediction."""
 
-# from itertools import izip, tee, groupby
 from itertools import izip, tee
-# from operator import itemgetter
-# from math import ceil
-# import random
 import numpy as np
 from collections import deque
 
 from eden.converter.rna.rnafold import rnafold_to_eden
 from eden.converter.rna.rnaplfold import rnaplfold_to_eden
-# from eden.util import mp_pre_process
 
 import protscan.common as common
 from protscan.util.data import HDFDataManager
@@ -134,82 +129,6 @@ def add_distance(graphs, bin_sites, max_distance=None):
             yield graph
 
 
-# def get_positive_subgraphs(graph_with_dist, max_dist, split_window):
-#     """Compute the start and end coordinates of positive subgraphs."""
-#     bin_centers = [k for k, n in graph_with_dist.node.iteritems()
-#                    if n['dist'] == 0]
-#     tr_len = graph_with_dist.graph['id']['tr_len']
-#     positive_subs = list()
-#     for bin_center in bin_centers:
-#         start = max(0, bin_center - max_dist - split_window / 2 + 1)
-#         end = min(bin_center + max_dist +
-#                   int(ceil(float(split_window) / 2)) - 1, tr_len)
-#         positive_subs.append((start, end))
-#     return positive_subs
-
-
-# def _find_intervals(node_list):
-#     """Find intervals of continuos points in a node list."""
-#     intervals = list()
-#     for k, g in groupby(enumerate(node_list), lambda (i, x): i - x):
-#         ran = map(itemgetter(1), g)
-#         if len(ran) > 1:
-#             start = ran[0]
-#             end = ran[-1]
-#             intervals.append((start, end))
-#     return intervals
-
-
-# def get_border_subgraphs(graph_with_dist, max_dist, split_window):
-#     """Compute the start and end coordinates of border subgraphs."""
-#     exact_borders = [k for k, n in graph_with_dist.node.iteritems() if n[
-#         'dist'] == max_dist]
-#     putative_borders = [k for k, n in graph_with_dist.node.iteritems(
-#     ) if max_dist <= n['dist'] < max_dist + split_window / 2]  # check <
-#     intervals = _find_intervals(putative_borders)
-#     tr_len = graph_with_dist.graph['id']['tr_len']
-#     border_subs = list()
-#     for i1, i2 in intervals:
-#         if i1 in exact_borders:
-#             start = max(0, i1 - int(ceil(float(split_window) / 2)))
-#             end = min(start + max_dist, i2)
-#             if end - start == max_dist:
-#                 border_subs.append((start, end))
-#         if i2 in intervals:
-#             end = min(i2 + split_window / 2, tr_len)
-#             start = max(i1, end - max_dist)
-#             if end - start == max_dist:
-#                 border_subs.append((start, end))
-
-#     return border_subs
-
-
-# def get_negative_subgraphs(graph_with_dist, max_dist, split_window,
-#                            negative_ratio=1, random_state=1234):
-#     """Compute the start and end coordinates of negative subgraphs."""
-#     # check >=
-#     putative_negatives = [k for k, n in graph_with_dist.node.iteritems(
-#     ) if n['dist'] is None or n['dist'] >= max_dist + split_window / 2]
-#     intervals = _find_intervals(putative_negatives)
-#     good_centers = list()
-#     for i1, i2 in intervals:
-#         if i1 < split_window / 2:
-#             i1 = split_window / 2
-#         tr_len = graph_with_dist.graph['id']['tr_len']
-#         if i2 > tr_len - split_window / 2:
-#             i2 = tr_len - split_window / 2
-#         win = i2 - i1 - 2 * max_dist
-#         center = common.center(i1, i2)
-#         for _ in range(win):
-#             good_centers.extend(range(center - win / 2, center + win / 2))
-#     random.seed(random_state)
-#     if negative_ratio < len(good_centers):
-#         good_centers = random.sample(good_centers, negative_ratio)
-#     negative_subs = [(c - max_dist - split_window / 2 + 1, c +
-#                       max_dist + split_window / 2 - 1) for c in good_centers]
-#     return negative_subs
-
-
 def _subgraph(graph, start, end, **add_params):
     """Generate subgraph from backbone positions plus base-paired nodes.
 
@@ -250,81 +169,6 @@ def _subgraph(graph, start, end, **add_params):
     for k, v in add_params.iteritems():
         sub.graph['id'][k] = v
     return sub
-
-
-# def train_selector(graphs, bin_sites, max_dist, random_state=1234, **params):
-#     """Select training subgraphs from folded RNA folded molecules.
-
-#     Parameters
-#     ----------
-#     graphs : iterable
-#         Graphs computed with one of the EDeN wrappers for the Vienna RNA
-#         package.
-
-#     bin_sites : dict
-#         Binding site regions (from bed_to_dictionary).
-
-#     max_dist : int
-#         Maximum distance from a binding site to be considered relevant.
-
-#     random_state : int (default : 1234)
-#         Seed for RNG that controls the sampling of the negative splits.
-
-#     **params : dict
-#         Dictionary of pre_processing parameters.
-
-#     Returns
-#     -------
-#     sub : NetworkX Graph
-#         Subgraph containing all the backbone nodes between start and end, plus
-#         all the nodes (and edges of these nodes) connected to the backbone of
-#         the subgraph through a 'basepair' edge.
-#     """
-#     negative_ratio = params.get('negative_ratio', 1)
-#     split_window = params.get('split_window', 50)
-
-#     non_binding = 0
-#     negative_remainder = 0
-#     graphs, graphs_ = tee(graphs)
-
-#     for g in graphs_:
-#         bins = bin_sites.get(g.graph['id']['tr_name'].split('.')[0], False)
-#         if bins is False:
-#             non_binding += 1
-#             continue
-
-#         # positive
-#         positive_subs = get_positive_subgraphs(g, max_dist, split_window)
-#         for start, end in positive_subs:
-#             yield _subgraph(g, start, end, type='POS')
-
-#         # border
-#         border_subs = get_border_subgraphs(g, max_dist, split_window)
-#         for start, end in border_subs:
-#             yield _subgraph(g, start, end, type='BOR')
-
-#         # negative
-#         negative_subs = get_negative_subgraphs(g, max_dist, split_window,
-#                                                negative_ratio, random_state)
-#         negative_remainder += max(0, len(positive_subs) *
-#                                   negative_ratio - len(negative_subs))
-#         for start, end in negative_subs:
-#             yield _subgraph(g, start, end, type='NEG')
-
-#     # account for missing negative subgraphs
-#     if negative_remainder > 0 and non_binding > 0:
-#         new_negative_ratio = int(
-#             ceil(float(negative_remainder) / non_binding))
-#         for g in graphs:
-#             bins = bin_sites.get(g.graph['id']['tr_name'].split('.')[0], False)
-#             if bins is False and negative_remainder > 1:
-#                 negative_subs = get_negative_subgraphs(g, max_dist,
-#                                                        split_window,
-#                                                        new_negative_ratio,
-#                                                        random_state)
-#                 for start, end in negative_subs:
-#                     negative_remainder -= 1
-#                     yield _subgraph(g, start, end, type='NEG')
 
 
 def split_iterator(graphs, **params):
