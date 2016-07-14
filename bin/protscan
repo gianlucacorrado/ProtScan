@@ -4,6 +4,7 @@
 import argparse
 import cPickle
 from time import time
+import datetime
 import os
 import numpy as np
 from eden.util import configure_logging, serialize_dict
@@ -733,10 +734,10 @@ if __name__ == "__main__":
     try:
         main(args)
     except Exception:
-        import datetime
         curr_time = datetime.datetime.now().strftime("%A, %d. %B %Y %I:%M%p")
         logger.exception("Program run failed on %s" % curr_time)
         exit(1)
     finally:
-        end_time = time()
-        logger.info('Elapsed time: %.1f sec', end_time - start_time)
+        delta_time = datetime.timedelta(
+            seconds=(time() - start_time))
+        logger.info("Total elapsed time: %s" % str(delta_time))

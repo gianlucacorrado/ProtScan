@@ -482,7 +482,7 @@ class RegressionModel(object):
             text.append(serialize_dict(smoothing_params))
             return '\n'.join(text)
 
-        logger.debug(_get_parameters_range())
+        # logger.debug(_get_parameters_range())
 
         # init
         n_failures = 0
@@ -552,7 +552,7 @@ class RegressionModel(object):
                         regressor_params = dict(best_regressor_params_)
                     if len(best_smoothing_params_) > 0:
                         smoothing_params = dict(best_smoothing_params_)
-                    logger.debug(_get_parameters_range())
+                    # logger.debug(_get_parameters_range())
 
                     if len(max_dist_vals) == 1 and \
                             len(preprocessor_params) == 1 and \
@@ -575,6 +575,9 @@ class RegressionModel(object):
                     self.vectorizer_args = self._sample(vectorizer_params)
                     self.regressor_args = self._sample(regressor_params)
 
+                logger.debug("Trying outer parameters:")
+                logger.debug(self.get_outer_parameters())
+
                 try:
                     opt_sequences, opt_sequences_ = tee(opt_sequences)
                     votes = self.cross_vote(opt_sequences_, bin_sites,
@@ -594,7 +597,7 @@ class RegressionModel(object):
                     text.append(e.__doc__)
                     text.append(e.message)
                     text.append("Failed with the following setting:")
-                    text.append(self.get_parameters())
+                    text.append(self.get_outer_parameters())
                     text.append("...continuing")
                     logger.debug('\n'.join(text))
                     n_failures += 1
@@ -607,6 +610,9 @@ class RegressionModel(object):
                     # for the other iterations, sample the parameters
                     else:
                         self.smoothing_args = self._sample(smoothing_params)
+
+                    logger.debug("Trying smoothing parameters:")
+                    logger.debug(self.get_inner_parameters())
 
                     try:
                         score = self.score_from_votes(votes, bin_sites)
@@ -662,6 +668,7 @@ class RegressionModel(object):
                         delta_time = datetime.timedelta(
                             seconds=(time.time() - start))
                         text = []
+                        text.append("-" * 80)
                         text.append("*" * 80)
                         text.append("New best solution found:")
                         text.append(
@@ -675,6 +682,7 @@ class RegressionModel(object):
                         text.append(
                             "Best score (AUC ROC): %.3f" % best_score_)
                         text.append("*" * 80)
+                        text.append("-" * 80)
                         logger.info('\n'.join(text))
 
             # store the best param configuration and save the model
