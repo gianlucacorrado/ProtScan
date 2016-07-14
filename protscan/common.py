@@ -67,13 +67,21 @@ def center(start, end):
     return center
 
 
-def bed_to_dictionary(bed):
+def bed_to_dictionary(bed, greater_equal=None, less_equal=None):
     """Build a dictionary with the start, stop of the binding sites.
 
     Parameters
     ----------
     bed : str
         Bed file.
+
+    greater_equal : float (default : None)
+        Select rows in the BED file with score value (5th column) greater or
+        equal to the specified value. None means no filtering.
+
+    less_equal : float (default : None)
+        Select rows in the BED file with score value (5th column) less or
+        equal to the specified value. None means no filtering.
 
     Returns
     -------
@@ -84,6 +92,22 @@ def bed_to_dictionary(bed):
     bin_sites = dict()
     f = open(bed)
     for line in f:
+        if greater_equal is not None or less_equal is not None:
+            try:
+                # if the 5th column is a score
+                score = float(line.strip().split()[4])
+            except:
+                continue
+            else:
+                # skip line if score does not satisfy the conditions
+                if greater_equal is not None:
+                    if score < greater_equal:
+                        continue
+
+                if less_equal is not None:
+                    if score > less_equal:
+                        continue
+
         seq_name = line.strip().split()[0]
         bin_start = int(line.strip().split()[1])
         bin_end = int(line.strip().split()[2])
