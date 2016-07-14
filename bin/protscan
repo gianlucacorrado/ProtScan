@@ -229,6 +229,16 @@ def argparse_setup(description, epilog):
                             improve the computation time, but it requires more
                             memory.""",
                             default=200)
+    opt_parser.add_argument("--max-splits",
+                            dest="max_splits",
+                            type=int,
+                            help="""Maximum number of splits to vectorize
+                            simultaneously. Some batches are bigger than others
+                            (due to the transcript size). Some paramenter
+                            configurations might generate more splits than
+                            others. This value must be set to a big value,
+                            it just keeps the memory requirement constant.""",
+                            default=100000)
     opt_parser.add_argument("-a", "--active-learning",
                             dest="active_learning",
                             help="Enable active learning.",
@@ -319,6 +329,16 @@ def argparse_setup(description, epilog):
                             improve the computation time, but it requires more
                             memory.""",
                             default=500)
+    fit_parser.add_argument("--max-splits",
+                            dest="max_splits",
+                            type=int,
+                            help="""Maximum number of splits to vectorize
+                            simultaneously. Some batches are bigger than others
+                            (due to the transcript size). Some paramenter
+                            configurations might generate more splits than
+                            others. This value must be set to a big value,
+                            it just keeps the memory requirement constant.""",
+                            default=100000)
     fit_parser.add_argument("-a", "--active-learning",
                             dest="active_learning",
                             help="Enable active learning.",
@@ -380,6 +400,16 @@ def argparse_setup(description, epilog):
                             improve the computation time, but it requires more
                             memory.""",
                             default=200)
+    pre_parser.add_argument("--max-splits",
+                            dest="max_splits",
+                            type=int,
+                            help="""Maximum number of splits to vectorize
+                            simultaneously. Some batches are bigger than others
+                            (due to the transcript size). Some paramenter
+                            configurations might generate more splits than
+                            others. This value must be set to a big value,
+                            it just keeps the memory requirement constant.""",
+                            default=100000)
     pre_parser.add_argument("--seed",
                             dest="random_state",
                             type=int,
@@ -461,6 +491,16 @@ def argparse_setup(description, epilog):
                             improve the computation time, but it requires more
                             memory.""",
                             default=200)
+    cpr_parser.add_argument("--max-splits",
+                            dest="max_splits",
+                            type=int,
+                            help="""Maximum number of splits to vectorize
+                            simultaneously. Some batches are bigger than others
+                            (due to the transcript size). Some paramenter
+                            configurations might generate more splits than
+                            others. This value must be set to a big value,
+                            it just keeps the memory requirement constant.""",
+                            default=100000)
     cpr_parser.add_argument("-a", "--active-learning",
                             dest="active_learning",
                             help="Enable active learning.",
@@ -529,6 +569,7 @@ def main_optimize(args):
                    two_steps_opt=args.two_steps_opt,
                    fit_batch_size=args.fit_batch_size,
                    pre_batch_size=args.pre_batch_size,
+                   max_splits=args.max_splits,
                    active_learning=args.active_learning,
                    fit_with_opt_params=args.fit_with_opt_params,
                    max_total_time=args.max_total_time,
@@ -580,6 +621,7 @@ def main_fit(args):
               bin_sites=bin_sites,
               model_name=args.model_file,
               fit_batch_size=args.fit_batch_size,
+              max_splits=args.max_splits,
               active_learning=args.active_learning,
               random_state=args.random_state,
               n_jobs=args.n_jobs)
@@ -600,6 +642,7 @@ def main_predict(args):
             profiles = model.predict(
                 sequences=sequences,
                 pre_batch_size=args.pre_batch_size,
+                max_splits=args.max_splits,
                 random_state=args.random_state,
                 n_jobs=args.n_jobs)
             f = open(args.output_file, 'w')
@@ -646,6 +689,7 @@ def main_cross_predict(args):
         bin_sites=bin_sites,
         fit_batch_size=args.fit_batch_size,
         pre_batch_size=args.pre_batch_size,
+        max_splits=args.max_splits,
         active_learning=args.active_learning,
         random_state=args.random_state,
         n_jobs=args.n_jobs)
