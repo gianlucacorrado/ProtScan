@@ -75,7 +75,6 @@ class RegressionModel(object):
 
         if mode == 'sequence':
             self.preprocessor = seq.sequence_preprocessor
-            self.vectorizer = SeqVectorizer(auto_weights=True)
             self.vote_aggregator = seq.vote_aggregator
         elif mode == 'rnafold' or mode == 'rnaplfold' or mode == 'store':
             if mode == 'rnafold':
@@ -85,7 +84,6 @@ class RegressionModel(object):
             else:
                 self.preprocessor = graph.store_preprocessor
                 self.preprocessor_args.update({'store_path': store_path})
-            self.vectorizer = GraphVectorizer(auto_weights=True)
             self.vote_aggregator = graph.vote_aggregator
         else:
             raise Exception("Unrecognized mode: %s" % mode)
@@ -159,8 +157,12 @@ class RegressionModel(object):
         else:
             dists = [g.graph['id']['dist'] for g in preprocessed_]
         vals = np.array([common.dist_to_val(d, self.max_dist) for d in dists])
-
-        self.vectorizer.set_params(**self.vectorizer_args)
+        if self.mode == 'sequence':
+            self.vectorizer = SeqVectorizer(auto_weights=True,
+                                            **self.vectorizer_args)
+        else:
+            self.vectorizer = GraphVectorizer(auto_weights=True,
+                                              **self.vectorizer_args)
         matrix = vectorize(preprocessed, vectorizer=self.vectorizer,
                            block_size=400, n_jobs=n_jobs)
         return matrix, vals
@@ -178,7 +180,12 @@ class RegressionModel(object):
         else:
             info = [_subdict(g.graph['id']) for g in preprocessed_]
 
-        self.vectorizer.set_params(**self.vectorizer_args)
+        if self.mode == 'sequence':
+            self.vectorizer = SeqVectorizer(auto_weights=True,
+                                            **self.vectorizer_args)
+        else:
+            self.vectorizer = GraphVectorizer(auto_weights=True,
+                                              **self.vectorizer_args)
         matrix = vectorize(preprocessed, vectorizer=self.vectorizer,
                            block_size=400, n_jobs=n_jobs)
         return matrix, info
