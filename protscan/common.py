@@ -4,6 +4,9 @@ from scipy.signal import gaussian
 from numpy import convolve
 from eden.modifier.fasta import fasta_to_fasta
 
+import logging
+logger = logging.getLogger(__name__)
+
 __author__ = "Gianluca Corrado"
 __copyright__ = "Copyright 2016, Gianluca Corrado"
 __license__ = "MIT"
@@ -67,7 +70,7 @@ def center(start, end):
     return center
 
 
-def bed_to_dictionary(bed, greater_equal=None, less_equal=None):
+def bed_to_dictionary(bed, less_equal=None, greater_equal=None):
     """Build a dictionary with the start, stop of the binding sites.
 
     Parameters
@@ -75,12 +78,12 @@ def bed_to_dictionary(bed, greater_equal=None, less_equal=None):
     bed : str
         Bed file.
 
-    greater_equal : float (default : None)
-        Select rows in the BED file with score value (5th column) greater or
-        equal to the specified value. None means no filtering.
-
     less_equal : float (default : None)
         Select rows in the BED file with score value (5th column) less or
+        equal to the specified value. None means no filtering.
+
+    greater_equal : float (default : None)
+        Select rows in the BED file with score value (5th column) greater or
         equal to the specified value. None means no filtering.
 
     Returns
@@ -90,8 +93,10 @@ def bed_to_dictionary(bed, greater_equal=None, less_equal=None):
         transcript.
     """
     bin_sites = dict()
+    n_bin_sites = n_kept = 0
     f = open(bed)
     for line in f:
+        n_bin_sites += 1
         if greater_equal is not None or less_equal is not None:
             try:
                 # if the 5th column is a score
@@ -100,14 +105,15 @@ def bed_to_dictionary(bed, greater_equal=None, less_equal=None):
                 continue
             else:
                 # skip line if score does not satisfy the conditions
-                if greater_equal is not None:
-                    if score < greater_equal:
-                        continue
-
                 if less_equal is not None:
                     if score > less_equal:
                         continue
 
+                if greater_equal is not None:
+                    if score < greater_equal:
+                        continue
+
+        n_kept += 1
         seq_name = line.strip().split()[0]
         bin_start = int(line.strip().split()[1])
         bin_end = int(line.strip().split()[2])
@@ -121,6 +127,8 @@ def bed_to_dictionary(bed, greater_equal=None, less_equal=None):
     # sort the binding sites
     for k, v in bin_sites.iteritems():
         bin_sites[k] = sorted(v)
+
+    logger.debug("Imported %d of %d binding sites." % (n_kept, n_bin_sites))
     return bin_sites
 
 

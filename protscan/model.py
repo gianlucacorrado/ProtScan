@@ -417,6 +417,8 @@ class RegressionModel(object):
                       pre_batch_size=200, max_splits=100000,
                       active_learning=False, random_state=1234, n_jobs=-1):
         """2-fold cross fit and predict."""
+        logger.debug("Model parameters:")
+        logger.debug(self.get_parameters())
         votes = self.cross_vote(sequences, bin_sites, fit_batch_size,
                                 pre_batch_size, max_splits, active_learning,
                                 random_state, n_jobs)

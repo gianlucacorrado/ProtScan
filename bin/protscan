@@ -163,6 +163,20 @@ def argparse_setup(description, epilog):
                             type=str,
                             help="""BED file with the binding sites.""",
                             required=True)
+    opt_parser.add_argument("--bed-less-equal",
+                            dest="less_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score less or equal than the specified
+                            value.""",
+                            default=None)
+    opt_parser.add_argument("--bed-greater-equal",
+                            dest="greater_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score greater or equal than the specified
+                            value.""",
+                            default=None)
     opt_parser.add_argument("-m", "--model-file",
                             dest="model_file",
                             type=str,
@@ -301,6 +315,20 @@ def argparse_setup(description, epilog):
                             type=str,
                             help="""BED file with the binding sites.""",
                             required=True)
+    fit_parser.add_argument("--bed-less-equal",
+                            dest="less_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score less or equal than the specified
+                            value.""",
+                            default=None)
+    fit_parser.add_argument("--bed-greater-equal",
+                            dest="greater_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score greater or equal than the specified
+                            value.""",
+                            default=None)
     fit_parser.add_argument("-m", "--model-file",
                             dest="model_file",
                             type=str,
@@ -448,6 +476,20 @@ def argparse_setup(description, epilog):
                             type=str,
                             help="""BED file with the binding sites.""",
                             required=True)
+    cpr_parser.add_argument("--bed-less-equal",
+                            dest="less_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score less or equal than the specified
+                            value.""",
+                            default=None)
+    cpr_parser.add_argument("--bed-greater-equal",
+                            dest="greater_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score greater or equal than the specified
+                            value.""",
+                            default=None)
     cpr_parser.add_argument("-m", "--model-file",
                             dest="model_file",
                             type=str,
@@ -544,7 +586,9 @@ def main_optimize(args):
     optimized parameters.
     """
     sequences = fasta_to_seq(args.fasta)
-    bin_sites = bed_to_dictionary(args.bed)
+    bin_sites = bed_to_dictionary(args.bed,
+                                  less_equal=args.less_equal,
+                                  greater_equal=args.greater_equal)
 
     max_dist_vals = init_max_dist_vals(args)
     preprocessor_params = init_preprocessor_params(args)
@@ -616,7 +660,9 @@ def main_fit(args):
             exit(1)
 
     sequences = fasta_to_seq(args.fasta)
-    bin_sites = bed_to_dictionary(args.bed)
+    bin_sites = bed_to_dictionary(args.bed,
+                                  less_equal=args.less_equal,
+                                  greater_equal=args.greater_equal)
 
     model.fit(sequences=sequences,
               bin_sites=bin_sites,
@@ -683,7 +729,9 @@ def main_cross_predict(args):
             exit(1)
 
     sequences = fasta_to_seq(args.fasta)
-    bin_sites = bed_to_dictionary(args.bed)
+    bin_sites = bed_to_dictionary(args.bed,
+                                  less_equal=args.less_equal,
+                                  greater_equal=args.greater_equal)
 
     profiles = model.cross_predict(
         sequences=sequences,
