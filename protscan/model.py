@@ -75,7 +75,7 @@ class RegressionModel(object):
 
         if mode == 'sequence':
             self.preprocessor = seq.sequence_preprocessor
-            self.vectorizer = SeqVectorizer()
+            self.vectorizer = SeqVectorizer(auto_weights=True)
             self.vote_aggregator = seq.vote_aggregator
         elif mode == 'rnafold' or mode == 'rnaplfold' or mode == 'store':
             if mode == 'rnafold':
@@ -85,7 +85,7 @@ class RegressionModel(object):
             else:
                 self.preprocessor = graph.store_preprocessor
                 self.preprocessor_args.update({'store_path': store_path})
-            self.vectorizer = GraphVectorizer()
+            self.vectorizer = GraphVectorizer(auto_weights=True)
             self.vote_aggregator = graph.vote_aggregator
         else:
             raise Exception("Unrecognized mode: %s" % mode)
