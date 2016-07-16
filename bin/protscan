@@ -45,8 +45,8 @@ def init_max_dist_vals(args):
     n_samples = vars(args).get('n_iter', 0)
     np.random.seed(args.random_state)
     max_dist_values = add_default(
-        50,  # default value
-        np.random.randint(25, 150, size=n_samples))
+        75,  # default value
+        np.random.randint(25, 250, size=n_samples))
     return max_dist_values
 
 
@@ -64,8 +64,8 @@ def init_preprocessor_params(args):
             np.random.randint(1, 10, size=n_samples)),
 
         'split_window': add_default(
-            50,  # default value
-            np.random.randint(25, 150, size=n_samples))
+            30,  # default value
+            np.random.randint(20, 100, size=n_samples))
     }
     return preprocessor_params
 
@@ -73,7 +73,7 @@ def init_preprocessor_params(args):
 def init_vectorizer_params(args):
     """Intialize vectorizer parameters."""
     vectorizer_params = {
-        'complexity': [3, 2],  # first is default
+        'complexity': [3, 2, 4, 5],  # first is default
 
         'nbits': [args.nbits]
     }
@@ -282,7 +282,7 @@ def argparse_setup(description, epilog):
                             dest="nbits",
                             type=int,
                             help="""Number of bits of the vetorizer.""",
-                            default=13)
+                            default=15)
     opt_parser.add_argument("--n-jobs",
                             dest="n_jobs",
                             type=int,
@@ -388,7 +388,7 @@ def argparse_setup(description, epilog):
                             dest="nbits",
                             type=int,
                             help="""Number of bits of the vetorizer.""",
-                            default=13)
+                            default=15)
     fit_parser.add_argument("-v", "--verbose",
                             action="count",
                             help="Increase output verbosity")
@@ -564,7 +564,7 @@ def argparse_setup(description, epilog):
                             dest="nbits",
                             type=int,
                             help="""Number of bits of the vetorizer.""",
-                            default=13)
+                            default=15)
     cpr_parser.add_argument("-v", "--verbose",
                             action="count",
                             help="Increase output verbosity")
