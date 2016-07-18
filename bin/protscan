@@ -73,7 +73,7 @@ def init_preprocessor_params(args):
 def init_vectorizer_params(args):
     """Intialize vectorizer parameters."""
     vectorizer_params = {
-        'complexity': [3, 2, 4, 5],  # first is default
+        'complexity': [4, 2, 3, 5],  # first is default
 
         'nbits': [args.nbits]
     }
@@ -92,23 +92,23 @@ def init_regressor_params(args):
 
         'alpha': add_default(
             0.0001,  # default value
-            random_exp_scale(-8, 0, size=n_samples)),
+            random_exp_scale(-5, -2, size=n_samples)),
 
         'l1_ratio': add_default(
             0.5,  # default value
-            np.random.uniform(0.1, 0.9, size=n_samples)),
+            np.random.uniform(0.25, 0.75, size=n_samples)),
 
         'n_iter': add_default(
             5,  # default value
-            np.random.randint(1, 50, size=n_samples)),
+            np.random.randint(3, 20, size=n_samples)),
 
         'eta0': add_default(
             0.01,  # default value
-            random_exp_scale(-4, -1, size=n_samples)),
+            random_exp_scale(-3, -1, size=n_samples)),
 
         'power_t': add_default(
             0.25,  # default value
-            np.random.uniform(0.1, 1.0, size=n_samples))
+            np.random.uniform(0.15, 0.5, size=n_samples))
     }
     return regressor_params
 
@@ -219,6 +219,12 @@ def argparse_setup(description, epilog):
                             maintaining the positive/negative ratio present in
                             the full dataset.""",
                             default=1.0)
+    opt_parser.add_argument("--opt-svm",
+                            dest="opt_svm",
+                            help="""Optimize SVM parameters. When False, use
+                            SVM default parameters.""",
+                            action="store_true",
+                            default=False)
     opt_parser.add_argument("--two-steps",
                             dest="two_steps_opt",
                             help="""Enable two steps optimization. After
@@ -606,6 +612,7 @@ def main_optimize(args):
                    n_iter=args.n_iter,
                    n_smoothing_iter=args.n_smoothing_iter,
                    opt_fraction=args.opt_fraction,
+                   opt_svm=args.opt_svm,
                    max_dist_vals=max_dist_vals,
                    preprocessor_params=preprocessor_params,
                    vectorizer_params=vectorizer_params,
