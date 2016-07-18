@@ -491,7 +491,7 @@ class RegressionModel(object):
             text.append(serialize_dict(smoothing_params))
             return '\n'.join(text)
 
-        # logger.debug(_get_parameters_range())
+        logger.debug(_get_parameters_range())
 
         # init
         n_failures = 0
@@ -580,9 +580,12 @@ class RegressionModel(object):
                 # for the other iterations, sample the parameters
                 else:
                     self.max_dist = random.choice(max_dist_vals)
-                    self.preprocessor_args = self._sample(preprocessor_params)
-                    self.vectorizer_args = self._sample(vectorizer_params)
-                    self.regressor_args = self._sample(regressor_params)
+                    self.preprocessor_args = self._sample(
+                        preprocessor_params, random_state=random_state + i)
+                    self.vectorizer_args = self._sample(
+                        vectorizer_params, random_state=random_state + i)
+                    self.regressor_args = self._sample(
+                        regressor_params, random_state=random_state + i)
 
                 logger.debug("Trying outer parameters:")
                 logger.debug(self.get_outer_parameters())
@@ -618,7 +621,9 @@ class RegressionModel(object):
                         self.smoothing_args = self._default(smoothing_params)
                     # for the other iterations, sample the parameters
                     else:
-                        self.smoothing_args = self._sample(smoothing_params)
+                        self.smoothing_args = self._sample(
+                            smoothing_params, random_state=random_state + i +
+                            smoothing_i)
 
                     logger.debug("Trying smoothing parameters:")
                     logger.debug(self.get_inner_parameters())
@@ -723,8 +728,9 @@ class RegressionModel(object):
                 "ERROR: no iteration has produced any viable solution.")
             exit(1)
 
-    def _sample(self, parameters):
+    def _sample(self, parameters, random_state):
         """Sample parameters at random."""
+        random.seed = random_state
         parameters_sample = dict()
         for parameter in parameters:
             values = parameters[parameter]
