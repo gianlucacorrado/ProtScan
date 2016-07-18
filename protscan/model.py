@@ -730,7 +730,7 @@ class RegressionModel(object):
 
     def _sample(self, parameters, random_state):
         """Sample parameters at random."""
-        random.seed = random_state
+        random.seed(random_state)
         parameters_sample = dict()
         for parameter in parameters:
             values = parameters[parameter]
