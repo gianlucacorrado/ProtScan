@@ -576,7 +576,7 @@ class RegressionModel(object):
                     self.max_dist = max_dist_vals[0]
                     self.preprocessor_args = self._default(preprocessor_params)
                     self.vectorizer_args = self._default(vectorizer_params)
-                    self.regressor_args = self._default(regressor_params)
+                    # self.regressor_args = self._default(regressor_params)
                 # for the other iterations, sample the parameters
                 else:
                     self.max_dist = random.choice(max_dist_vals)
@@ -584,8 +584,10 @@ class RegressionModel(object):
                         preprocessor_params, random_state=random_state + i)
                     self.vectorizer_args = self._sample(
                         vectorizer_params, random_state=random_state + i)
-                    self.regressor_args = self._sample(
-                        regressor_params, random_state=random_state + i)
+                    # self.regressor_args = self._sample(
+                    #     regressor_params, random_state=random_state + i)
+
+                self.regressor_args = self._default(regressor_params)
 
                 logger.debug("Trying outer parameters:")
                 logger.debug(self.get_outer_parameters())
