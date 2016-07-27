@@ -10,7 +10,9 @@ import numpy as np
 from eden.util import configure_logging, serialize_dict
 from protscan.common import fasta_to_seq, bed_to_dictionary
 from protscan.util import add_default, random_exp_scale
+from protscan.util import output_peaks
 from protscan.model import RegressionModel
+from protscan.peak import find_peaks
 
 import logging
 
@@ -579,6 +581,82 @@ def argparse_setup(description, epilog):
                             help="If set, do not log on file.",
                             action="store_true")
 
+    # peak extraction commands
+    ext_parser = subparsers.add_parser(
+        'extractpeaks',
+        help="Extract peaks from a predicted profile.",
+        formatter_class=DefaultsRawDescriptionHelpFormatter)
+    ext_parser.set_defaults(which='extractpeaks')
+    # # add domain specific arguments
+    ext_parser.add_argument("-p", "--profiles",
+                            dest="profiles",
+                            type=str,
+                            help="""Predicted profiles.""",
+                            required=True)
+    ext_parser.add_argument("-b", "--bed",
+                            dest="bed",
+                            type=str,
+                            help="""BED file with the binding sites.""",
+                            required=True)
+    ext_parser.add_argument("--bed-less-equal",
+                            dest="less_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score less or equal than the specified
+                            value.""",
+                            default=None)
+    ext_parser.add_argument("--bed-greater-equal",
+                            dest="greater_equal",
+                            type=float,
+                            help="""Select binding sites from the BED file
+                            with score greater or equal than the specified
+                            value.""",
+                            default=None)
+    ext_parser.add_argument("-o", "--output-file",
+                            dest="output_file",
+                            type=str,
+                            help="""File name for the output file. The output
+                            will be in standard BED format (6 columns).""",
+                            required=True)
+    ext_parser.add_argument("--pval-threshold",
+                            dest="pval_threshold",
+                            type=float,
+                            help="""Select peaks with p-value less or equal
+                            than the specified threshold.""",
+                            default=0.1)
+    ext_parser.add_argument("--window",
+                            dest="window",
+                            type=int,
+                            help="""Window size of mean shift. It defines the
+                            resolution of the peaks. Peaks wich are closer than
+                            the specified value, will considered as one.""",
+                            default=10)
+    ext_parser.add_argument("--sort-by-pval",
+                            dest="sorted_by_pval",
+                            help="""If set, sort the peaks according to the
+                            p-value. If not set the list is sorted by
+                            transcript name.""",
+                            action="store_true")
+    ext_parser.add_argument("--seed",
+                            dest="random_state",
+                            type=int,
+                            help="""Random state for the pseudo randomness.""",
+                            default=1234)
+    ext_parser.add_argument("--n-jobs",
+                            dest="n_jobs",
+                            type=int,
+                            help="""Number of cores to use for the
+                            vectorization. A value of -1 means all the
+                            available cores.""",
+                            default=-1)
+    ext_parser.add_argument("-v", "--verbose",
+                            action="count",
+                            help="Increase output verbosity")
+    ext_parser.add_argument("-x", "--no-logging",
+                            dest="no_logging",
+                            help="If set, do not log on file.",
+                            action="store_true")
+
     return parser
 
 
@@ -754,6 +832,26 @@ def main_cross_predict(args):
     f.close()
 
 
+def main_extract_peaks(args):
+    """Extract peaks."""
+    f = open(args.profiles)
+    profiles = cPickle.load(f)
+    f.close()
+    bin_sites = bed_to_dictionary(args.bed,
+                                  less_equal=args.less_equal,
+                                  greater_equal=args.greater_equal)
+
+    selected_peaks = find_peaks(profiles=profiles,
+                                bin_sites=bin_sites,
+                                pval_threshold=args.pval_threshold,
+                                window=args.window,
+                                sorted_by_pval=args.sorted_by_pval,
+                                random_state=args.random_state,
+                                n_jobs=args.n_jobs)
+
+    output_peaks(selected_peaks, args.profiles, args.output_file)
+
+
 def main(args):
     """Main."""
     if args.which == 'optimize':
@@ -764,6 +862,8 @@ def main(args):
         main_predict(args)
     elif args.which == 'crosspredict':
         main_cross_predict(args)
+    elif args.which == 'extractpeaks':
+        main_extract_peaks(args)
     else:
         raise Exception('Unknown mode: %s' % args.which)
 

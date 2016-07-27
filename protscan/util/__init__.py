@@ -142,3 +142,12 @@ def np_random_permutation(matrix, vals, random_state=1234):
     np.random.shuffle(perm)
 
     return matrix[perm], vals[perm]
+
+
+def output_peaks(peaks, profile_name, output_file):
+    """Output the selected peaks in BED standard format."""
+    bed_file = open(output_file, 'w')
+    for i, (tr_name, start, end, pval) in enumerate(peaks):
+        bed_file.write("%s\t%i\t%i\t%s_%06i\t%f\t+\n" %
+                       (tr_name, start, end, profile_name, i, pval))
+    bed_file.close()
