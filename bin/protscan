@@ -645,8 +645,8 @@ def argparse_setup(description, epilog):
     ext_parser.add_argument("--n-jobs",
                             dest="n_jobs",
                             type=int,
-                            help="""Number of cores to use for the
-                            vectorization. A value of -1 means all the
+                            help="""Number of cores to use.
+                            A value of -1 means all the
                             available cores.""",
                             default=-1)
     ext_parser.add_argument("-v", "--verbose",
