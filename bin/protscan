@@ -61,9 +61,7 @@ def init_preprocessor_params(args):
             3.,  # default value
             np.random.uniform(1., 9., size=n_samples)),
 
-        'split_step': add_default(
-            3,  # default value
-            np.random.randint(1, 10, size=n_samples)),
+        'split_step': [3],
 
         'split_window': add_default(
             70,  # default value
