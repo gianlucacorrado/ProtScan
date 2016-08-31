@@ -626,7 +626,7 @@ def argparse_setup(description, epilog):
                             dest="window",
                             type=int,
                             help="""Window size of mean shift. It defines the
-                            resolution of the peaks. Peaks wich are closer than
+                            resolution of the peaks. Peaks which are closer than
                             the specified value, will considered as one.""",
                             default=10)
     ext_parser.add_argument("--sort-by-pval",
