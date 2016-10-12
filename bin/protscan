@@ -47,8 +47,8 @@ def init_max_dist_vals(args):
     n_samples = vars(args).get('n_iter', 0)
     np.random.seed(args.random_state)
     max_dist_values = add_default(
-        75,  # default value
-        np.random.randint(30, 150, size=n_samples))
+        54,  # default value
+        np.random.randint(50, 70, size=n_samples))
     return max_dist_values
 
 
@@ -58,14 +58,14 @@ def init_preprocessor_params(args):
     n_samples = vars(args).get('n_iter', 0)
     preprocessor_params = {
         'negative_ratio': add_default(
-            3.,  # default value
-            np.random.uniform(1., 9., size=n_samples)),
+            4.3,  # default value
+            np.random.uniform(2., 9., size=n_samples)),
 
         'split_step': [3],
 
         'split_window': add_default(
             70,  # default value
-            np.random.randint(30, 100, size=n_samples))
+            np.random.randint(30, 90, size=n_samples))
     }
     return preprocessor_params
 
@@ -73,7 +73,7 @@ def init_preprocessor_params(args):
 def init_vectorizer_params(args):
     """Intialize vectorizer parameters."""
     vectorizer_params = {
-        'complexity': [4, 2, 3, 5],  # first is default
+        'complexity': [3, 4],  # first is default
 
         'nbits': [args.nbits]
     }
@@ -119,11 +119,11 @@ def init_smoothing_params(args):
     n_samples = vars(args).get('n_iter', 0)
     smoothing_params = {
         'window': add_default(
-            110,  # default value
-            np.random.randint(30, 150, size=n_samples)),
+            148,  # default value
+            np.random.randint(100, 200, size=n_samples)),
         'std': add_default(
-            70,  # default value
-            np.random.randint(20, 100, size=n_samples)),
+            95,  # default value
+            np.random.randint(70, 120, size=n_samples)),
     }
     return smoothing_params
 
@@ -626,8 +626,9 @@ def argparse_setup(description, epilog):
                             dest="window",
                             type=int,
                             help="""Window size of mean shift. It defines the
-                            resolution of the peaks. Peaks which are closer than
-                            the specified value, will considered as one.""",
+                            resolution of the peaks. Peaks which are closer
+                            than the specified value, will considered as
+                            one.""",
                             default=10)
     ext_parser.add_argument("--sort-by-pval",
                             dest="sorted_by_pval",
