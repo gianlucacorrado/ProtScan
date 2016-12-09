@@ -177,6 +177,11 @@ def argparse_setup(description, epilog):
                             with score greater or equal than the specified
                             value.""",
                             default=None)
+    opt_parser.add_argument("--ignore",
+                            dest="ignore",
+                            type=str,
+                            help="""File listing the transcripts to ignore.""",
+                            default=None)
     opt_parser.add_argument("-m", "--model-file",
                             dest="model_file",
                             type=str,
@@ -335,6 +340,11 @@ def argparse_setup(description, epilog):
                             with score greater or equal than the specified
                             value.""",
                             default=None)
+    fit_parser.add_argument("--ignore",
+                            dest="ignore",
+                            type=str,
+                            help="""File listing the transcripts to ignore.""",
+                            default=None)
     fit_parser.add_argument("-m", "--model-file",
                             dest="model_file",
                             type=str,
@@ -415,6 +425,11 @@ def argparse_setup(description, epilog):
                             type=str,
                             help="""Fasta file of the RNA sequences.""",
                             required=True)
+    pre_parser.add_argument("--ignore",
+                            dest="ignore",
+                            type=str,
+                            help="""File listing the transcripts to ignore.""",
+                            default=None)
     pre_parser.add_argument("-m", "--model-file",
                             dest="model_file",
                             type=str,
@@ -495,6 +510,11 @@ def argparse_setup(description, epilog):
                             help="""Select binding sites from the BED file
                             with score greater or equal than the specified
                             value.""",
+                            default=None)
+    cpr_parser.add_argument("--ignore",
+                            dest="ignore",
+                            type=str,
+                            help="""File listing the transcripts to ignore.""",
                             default=None)
     cpr_parser.add_argument("-m", "--model-file",
                             dest="model_file",
@@ -668,10 +688,11 @@ def main_optimize(args):
     Additionally it is possible to fit the model on the full dataset using the
     optimized parameters.
     """
-    sequences = fasta_to_seq(args.fasta)
+    sequences = fasta_to_seq(args.fasta, ignore=args.ignore)
     bin_sites = bed_to_dictionary(args.bed,
                                   less_equal=args.less_equal,
-                                  greater_equal=args.greater_equal)
+                                  greater_equal=args.greater_equal,
+                                  ignore=args.ignore)
 
     max_dist_vals = init_max_dist_vals(args)
     preprocessor_params = init_preprocessor_params(args)
@@ -743,10 +764,11 @@ def main_fit(args):
             raise Exception("Model file %s not found, 'mode' cannot be None.")
             exit(1)
 
-    sequences = fasta_to_seq(args.fasta)
+    sequences = fasta_to_seq(args.fasta, ignore=args.ignore)
     bin_sites = bed_to_dictionary(args.bed,
                                   less_equal=args.less_equal,
-                                  greater_equal=args.greater_equal)
+                                  greater_equal=args.greater_equal,
+                                  ignore=args.ignore)
 
     model.fit(sequences=sequences,
               bin_sites=bin_sites,
@@ -768,7 +790,7 @@ def main_predict(args):
         raise Exception("Model file %s not found." % args.model_file)
         exit(1)
     else:
-        sequences = fasta_to_seq(args.fasta)
+        sequences = fasta_to_seq(args.fasta, ignore=args.ignore)
         if model.is_fitted is True:
             profiles = model.predict(
                 sequences=sequences,
@@ -812,10 +834,11 @@ def main_cross_predict(args):
             raise Exception("--mode must be set.")
             exit(1)
 
-    sequences = fasta_to_seq(args.fasta)
+    sequences = fasta_to_seq(args.fasta, ignore=args.ignore)
     bin_sites = bed_to_dictionary(args.bed,
                                   less_equal=args.less_equal,
-                                  greater_equal=args.greater_equal)
+                                  greater_equal=args.greater_equal,
+                                  ignore=args.ignore)
 
     profiles = model.cross_predict(
         sequences=sequences,

@@ -15,13 +15,25 @@ __email__ = "gianluca.corrado@unitn.it"
 __status__ = "Production"
 
 
-def fasta_to_seq(input):
+def _load_ignore_list(ignore):
+    try:
+        f = open(ignore)
+        ignore_list = f.read().strip().split()
+        f.close()
+    except:
+        ignore_list = []
+    return ignore_list
+
+
+def fasta_to_seq(input, ignore=None):
     """Load sequences tuples from fasta file.
 
     Parameters
     ----------
     input : str
         Fasta file.
+    ignore : str (default : None)
+        File containing a list of transcripts to ignore.
 
     Returns
     -------
@@ -32,6 +44,7 @@ def fasta_to_seq(input):
     seq : str
         Sequence.
     """
+    ignore_list = _load_ignore_list(ignore)
     lines = fasta_to_fasta(input)
     for line in lines:
         attr = dict()
@@ -41,6 +54,8 @@ def fasta_to_seq(input):
         attr['length'] = len(seq)
         if len(seq) == 0:
             raise Exception("ERROR: empty sequence")
+        if attr['tr_name'] in ignore_list:
+            continue
         yield attr, seq
 
 
@@ -70,7 +85,7 @@ def center(start, end):
     return center
 
 
-def bed_to_dictionary(bed, less_equal=None, greater_equal=None):
+def bed_to_dictionary(bed, less_equal=None, greater_equal=None, ignore=None):
     """Build a dictionary with the start, stop of the binding sites.
 
     Parameters
@@ -85,6 +100,8 @@ def bed_to_dictionary(bed, less_equal=None, greater_equal=None):
     greater_equal : float (default : None)
         Select rows in the BED file with score value (5th column) greater or
         equal to the specified value. None means no filtering.
+    ignore : str (default : None)
+        File containing a list of transcripts to ignore.
 
     Returns
     -------
@@ -92,11 +109,15 @@ def bed_to_dictionary(bed, less_equal=None, greater_equal=None):
         Dictionary of triplets (bin_start, bin_end, center). One entry per
         transcript.
     """
+    ignore_list = _load_ignore_list(ignore)
     bin_sites = dict()
     n_bin_sites = n_kept = 0
     f = open(bed)
     for line in f:
         n_bin_sites += 1
+        seq_name = line.strip().split()[0]
+        if seq_name in ignore_list:
+            continue
         if greater_equal is not None or less_equal is not None:
             try:
                 # if the 5th column is a score
@@ -114,7 +135,6 @@ def bed_to_dictionary(bed, less_equal=None, greater_equal=None):
                         continue
 
         n_kept += 1
-        seq_name = line.strip().split()[0]
         bin_start = int(line.strip().split()[1])
         bin_end = int(line.strip().split()[2])
         if seq_name in bin_sites.keys():
