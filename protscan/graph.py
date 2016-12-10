@@ -8,7 +8,6 @@ from eden.converter.rna.rnafold import rnafold_to_eden
 from eden.converter.rna.rnaplfold import rnaplfold_to_eden
 
 import protscan.common as common
-from protscan.util.data import HDFDataManager
 
 __author__ = "Gianluca Corrado"
 __copyright__ = "Copyright 2016, Gianluca Corrado"
@@ -267,19 +266,6 @@ def rnaplfold_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
                            random_state=1234, **params):
     """Fold sequences with RNAplfold and preprocess graphs."""
     graphs = rnaplfold(iterable)
-
-    graphs = graph_preprocessor(graphs, which_set, bin_sites, max_dist,
-                                random_state, **params)
-    return graphs
-
-
-def store_preprocessor(iterable, which_set, bin_sites=None, max_dist=None,
-                       random_state=1234, **params):
-    """Retrieve folded sequences from HDF store and preprocess graphs."""
-    store_path = params.get('store_path')
-    data_manager = HDFDataManager(store_path)
-    names = [attr['tr_name'] for attr, _ in iterable]
-    graphs = data_manager.retrieve(names)
 
     graphs = graph_preprocessor(graphs, which_set, bin_sites, max_dist,
                                 random_state, **params)

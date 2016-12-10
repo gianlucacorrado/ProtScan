@@ -193,12 +193,6 @@ def argparse_setup(description, epilog):
                             help="""protscan mode, either 'sequence',
                             'rnafold' or 'rnaplfold'.""",
                             required=True)
-    opt_parser.add_argument("--store-path",
-                            dest="store_path",
-                            type=str,
-                            help="""Path to store. To use only if --mode is
-                            set to store.""",
-                            default=None)
     opt_parser.add_argument("-e", "--n-iter",
                             dest="n_iter",
                             type=int,
@@ -359,12 +353,6 @@ def argparse_setup(description, epilog):
                             'rnafold' or 'rnaplfold'. To be specified in case
                             no model is provided as input. Default
                             hyperparameters will be set automatically.""",
-                            default=None)
-    fit_parser.add_argument("--store-path",
-                            dest="store_path",
-                            type=str,
-                            help="""Path to store. To use only if --mode is
-                            set to store.""",
                             default=None)
     fit_parser.add_argument("--fit-batch-size",
                             dest="fit_batch_size",
@@ -531,12 +519,6 @@ def argparse_setup(description, epilog):
                             no model is provided as input. Default
                             hyperparameters will be set automatically.""",
                             default=None)
-    cpr_parser.add_argument("--store-path",
-                            dest="store_path",
-                            type=str,
-                            help="""Path to store. To use only if --mode is
-                            set to store.""",
-                            default=None)
     cpr_parser.add_argument("-o", "--output-file",
                             dest="output_file",
                             type=str,
@@ -701,7 +683,6 @@ def main_optimize(args):
     smoothing_params = init_smoothing_params(args)
 
     model = RegressionModel(mode=args.mode,
-                            store_path=args.store_path,
                             random_state=args.random_state)
 
     model.optimize(sequences=sequences,
@@ -746,7 +727,6 @@ def main_fit(args):
         # with default parameters.
         if args.mode is not None:
             model = RegressionModel(mode=args.mode,
-                                    store_path=args.store_path,
                                     random_state=args.random_state)
             # parameters
             max_dist_vals = init_max_dist_vals(args)
@@ -815,7 +795,6 @@ def main_cross_predict(args):
     except:
         if args.mode is not None:
             model = RegressionModel(mode=args.mode,
-                                    store_path=args.store_path,
                                     random_state=args.random_state)
 
             # parameters

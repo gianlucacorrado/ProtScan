@@ -46,18 +46,13 @@ class RegressionModel(object):
 
     def __init__(self,
                  mode='sequence',
-                 store_path=None,
                  random_state=1234):
         """Constructor.
 
         Params
         ------
         mode : str
-            Values: 'sequence', 'rnafold', 'rnaplfold' or 'store'.
-
-        store_path : str (default : None)
-            Path to the HDFStore (handled by HDFDataManager) containing
-            the folded RNA structures.
+            Values: 'sequence', 'rnafold' or 'rnaplfold'.
 
         n_jobs : int (default : -1)
             Number of jobs.
@@ -76,14 +71,11 @@ class RegressionModel(object):
         if mode == 'sequence':
             self.preprocessor = seq.sequence_preprocessor
             self.vote_aggregator = seq.vote_aggregator
-        elif mode == 'rnafold' or mode == 'rnaplfold' or mode == 'store':
+        elif mode == 'rnafold' or mode == 'rnaplfold':
             if mode == 'rnafold':
                 self.preprocessor = graph.rnafold_preprocessor
-            elif mode == 'rnaplfold':
-                self.preprocessor = graph.rnaplfold_preprocessor
             else:
-                self.preprocessor = graph.store_preprocessor
-                self.preprocessor_args.update({'store_path': store_path})
+                self.preprocessor = graph.rnaplfold_preprocessor
             self.vote_aggregator = graph.vote_aggregator
         else:
             raise Exception("Unrecognized mode: %s" % mode)
