@@ -24,7 +24,7 @@ setup(
     include_package_data=True,
     package_data={},
     license="MIT",
-    description="""""",
+    description="""Protein-RNA target site modelling and prediction.""",
     long_description=open('README.md').read(),
     install_requires=[
         "eden",
