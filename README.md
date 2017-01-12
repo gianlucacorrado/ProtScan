@@ -3,7 +3,12 @@ Protein-RNA target site modelling and prediction.
 
 Installation
 ------------
-First install EDeN. For EDeN installation, please refer to [EDeN repository](https://github.com/fabriziocosta/EDeN)
+First install EDeN (for EDeN installation, please refer to [EDeN repository](https://github.com/fabriziocosta/EDeN)) and the other dependencies:
+```
+joblib (tested on v. 0.9.4)
+numpy (tested on v. 1.11.2)
+scipy (tested on v. 0.18.1)
+```
 
 Then, clone the ProtScan repository
 ```
