@@ -26,10 +26,5 @@ setup(
     license="MIT",
     description="""Protein-RNA target site modelling and prediction.""",
     long_description=open('README.md').read(),
-    install_requires=[
-        "eden",
-        "joblib >= 0.9.4",
-        "numpy >= 1.11.2",
-        "scipy >= 0.18.1"
-    ],
+    install_requires=[],
 )
