@@ -207,5 +207,5 @@ def vote_aggregator(pred_vals, info, max_dist):
                 votes[tr_name][downstream] += pv
             upstream = center + pd
             if upstream < tr_len:
-                votes[tr_name][downstream] += pv
+                votes[tr_name][upstream] += pv
     return votes
