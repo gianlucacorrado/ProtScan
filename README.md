@@ -3,7 +3,7 @@ Protein-RNA target site modelling and prediction.
 
 Installation
 ------------
-First install EDeN (for EDeN installation, please refer to [EDeN repository](https://github.com/fabriziocosta/EDeN)) and the other dependencies:
+First install EDeN 1.0 (for EDeN installation, please refer to [EDeN repository](https://github.com/fabriziocosta/EDeN/releases/tag/v1.0)) and the other dependencies:
 ```
 joblib (tested on v. 0.9.4)
 numpy (tested on v. 1.11.2)
